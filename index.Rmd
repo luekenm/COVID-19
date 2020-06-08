@@ -1,0 +1,12 @@
+---
+title: "BIOL 390: COVID-19"
+author: "Mitch Lueken"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{R, setup, echo = FALSE, results = 'hide', message = FALSE, warnings = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warnings = FALSE)
+```
