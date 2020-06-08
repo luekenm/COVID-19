@@ -18,4 +18,4 @@
 
 ## Viewing this Project
 
-The completed project files can be accessed online at GitHub.com/luekenm/COVID-19/COVID-19.Rproj. The repo for this reproducible project is also publicly available at GitHub.com/luekenm/COVID-19. 
+The completed project files can be accessed online at GitHub.com/luekenm/COVID-19/COVID-19. The repo for this reproducible project is also publicly available at GitHub.com/luekenm/COVID-19.git. 
