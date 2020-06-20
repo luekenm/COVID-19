@@ -1,0 +1,101 @@
+---
+title: "Data Gathering"
+author: "Mitch Lueken"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(HelpersMG)
+library(lubridate)
+library(ggplot2)
+library(kableExtra)
+library(readxl)
+```
+
+```{r gimmeData, echo = FALSE, message = FALSE}
+if(!file.exists("./raw_data/States-Cases.tsv")) {
+  wget(url = "https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/HIDLTK/ROCWVZ", destfile = "./raw_data/States-Cases.tsv")
+}
+if(!file.exists("./raw_data/States-Deaths.tsv")) {
+  wget(url = "https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/HIDLTK/DOK6EK", destfile = "./raw_data/States-Deaths.tsv")
+}
+if(!file.exists("./raw_data/States-Votes.xlsx")) {
+  wget(url = "https://www.fec.gov/documents/1890/federalelections2016.xlsx", destfile = "./raw_data/States-Votes.xlsx", compression=none) # Gives corrupted file for some reason, manual download works fine
+}
+if(!file.exists("./raw_data/States-Governors.csv")) {
+  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
+}
+```
+
+```{r covidData, echo = FALSE, message = FALSE}
+dateButchery <- function(date) {
+	return(mdy(paste(substr(date, 6, 7), "-", substr(date, 9, 10), "-", substr(date, 1, 4))))
+}
+
+tally <- function(column) {
+  index = 1
+	for(element in column) {
+	  if(index > 1) {
+        if(column[[index]] - column[[index - 1]] < 0) { # No negatives
+          column[[index]] = 0
+      } else {
+          column[[index]] = column[[index]] - column[[index - 1]]
+      }
+    }
+	    index = index + 1
+  }
+  	return(column)
+}
+
+cases <- read_tsv("./raw_data/States-Cases.tsv") %>%
+  select(-c(fips, POP70, HHD70, POP80, HHD80, POP90, HHD90, POP00, HHD00, POP10, HHD10)) %>%
+	pivot_longer(-NAME,
+				 names_to = "Date",
+				 values_to = "Total_Cases") %>%
+	mutate(Date = dateButchery(Date))
+
+read_tsv("./raw_data/States-Deaths.tsv") %>%
+  select(-c(fips, POP70, HHD70, POP80, HHD80, POP90, HHD90, POP00, HHD00, HHD10)) %>%
+	pivot_longer(-c(NAME, POP10),
+				 names_to = "Date",
+				 values_to = "Total_Deaths") %>%
+	rename(Population = POP10) %>%
+	mutate(Date = dateButchery(Date)) %>%
+  right_join(cases, by = c("NAME", "Date")) %>%
+  rename(State = NAME) %>%
+  mutate(Daily_Cases = tally(Total_Cases),
+         Daily_Deaths = tally(Total_Deaths),
+         Per_Capita_Total_Cases = Total_Cases / Population,
+         Per_Capita_Total_Deaths = Total_Deaths / Population,
+         Per_Capita_Daily_Cases = Daily_Cases / Population,
+         Per_Capita_Daily_Deaths = Daily_Deaths / Population) %>%
+	write.table(file = "./output/States_COVID_data_by_date.csv", row.names = FALSE, sep = ",")
+```
+
+```{r electionData, echo = FALSE, message = FALSE}
+margin <- function(trump, clinton) {
+  index = 1
+  for(votes in trump) {
+    trump[[index]] = (trump[[index]] - clinton[[index]]) / (trump[[index]] + clinton[[index]])
+    index = index + 1
+  }
+  return(trump)
+}
+
+read_excel("./raw_data/States-Votes.xlsx", sheet = "Table 2. Electoral &  Pop Vote") %>%
+  select(1, 4, 5) %>%
+  rename(State = 1, Trump = 2, Clinton = 3) %>%
+  slice(4:54) %>%
+  mutate(Trump = as.numeric(Trump), Clinton = as.numeric(Clinton)) %>%
+  mutate(Margin = margin(Trump, Clinton)) %>%
+  full_join(read_csv("./raw_data/States-Governors.csv"), by = "State") %>%
+  write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
+```
+
+## Reference
+
+1. China Data Lab, 2020, "US COVID-19 Daily Cases with Basemap", https://doi.org/10.7910/DVN/HIDLTK, Harvard Dataverse, V29, UNF:6:y1QAODHTEl8JQUjhLX6+Kw== [fileUNF]
+1. Federal Election Commission
+1. Wikipedia
