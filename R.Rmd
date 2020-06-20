@@ -12,6 +12,7 @@ library(lubridate)
 library(ggplot2)
 library(kableExtra)
 library(readxl)
+library(haven)
 ```
 
 ```{r gimmeData, echo = FALSE, message = FALSE}
@@ -26,6 +27,11 @@ if(!file.exists("./raw_data/States-Votes.xlsx")) {
 }
 if(!file.exists("./raw_data/States-Governors.csv")) {
   wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
+}
+if(!file.exists("./raw_data/LLCP2018.XPT")) {
+  wget(url = "https://www.cdc.gov/brfss/annual_data/2018/files/LLCP2018XPT.zip", destfile = "./raw_data/LLCP2018XPT.zip")
+  unzip("./raw_data/LLCP2018XPT.zip", exdir = "./raw_data")
+  unlink("./raw_data/LLCP2018XPT.zip")
 }
 ```
 
@@ -92,6 +98,141 @@ read_excel("./raw_data/States-Votes.xlsx", sheet = "Table 2. Electoral &  Pop Vo
   mutate(Margin = margin(Trump, Clinton)) %>%
   full_join(read_csv("./raw_data/States-Governors.csv"), by = "State") %>%
   write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
+```
+
+```{r healthData, echo = FALSE}
+fipsTranslator <- function(column) {
+  index = 1
+  for(integer in column) {
+    if(integer == 01) {
+      column[[index]]="AL"
+    } else if(integer == 02) {
+      column[[index]]="AK"
+    } else if(integer == 04) {
+      column[[index]]="AZ"
+    } else if(integer == 05) {
+     column[[index]]="AR"
+    } else if(integer == 06) {
+      column[[index]]="CA"
+    } else if(integer == 08) {
+      column[[index]]="CO"
+    } else if(integer == 09) {
+      column[[index]]="CT"
+    } else if(integer == 10) {
+      column[[index]]="DE"
+    } else if(integer == 11) {
+      column[[index]]="DC"
+    } else if(integer == 12) {
+      column[[index]]="FL"
+    } else if(integer == 13) {
+      column[[index]]="GA"
+    } else if(integer == 15) {
+      column[[index]]="HI"
+    } else if(integer == 16) {
+      column[[index]]="ID"
+    } else if(integer == 17) {
+      column[[index]]="IL"
+    } else if(integer == 18) {
+      column[[index]]="IN"
+    } else if(integer == 19) {
+      column[[index]]="IA"
+    } else if(integer == 20) {
+      column[[index]]="KS"
+    } else if(integer == 21) {
+      column[[index]]="KY"
+    } else if(integer == 22) {
+      column[[index]]="LA"
+    } else if(integer == 23) {
+      column[[index]]="ME"
+    } else if(integer == 24) {
+      column[[index]]="MD"
+    } else if(integer == 25) {
+      column[[index]]="MA"
+    } else if(integer == 26) {
+      column[[index]]="MI"
+    } else if(integer == 27) {
+      column[[index]]="MN"
+    } else if(integer == 28) {
+      column[[index]]="MS"
+    } else if(integer == 29) {
+      column[[index]]="MO"
+    } else if(integer == 30) {
+      column[[index]]="MT"
+    } else if(integer == 31) {
+      column[[index]]="NE"
+    } else if(integer == 32) {
+      column[[index]]="NV"
+    } else if(integer == 33) {
+      column[[index]]="NH"
+    } else if(integer == 34) {
+      column[[index]]="NJ"
+    } else if(integer == 35) {
+      column[[index]]="NM"
+    } else if(integer == 36) {
+      column[[index]]="NY"
+    } else if(integer == 37) {
+      column[[index]]="NC"
+    } else if(integer == 38) {
+      column[[index]]="ND"
+    } else if(integer == 39) {
+      column[[index]]="OH"
+    } else if(integer == 40) {
+      column[[index]]="OK"
+    } else if(integer == 41) {
+      column[[index]]="OR"
+    } else if(integer == 42) {
+      column[[index]]="PA"
+    } else if(integer == 44) {
+      column[[index]]="RI"
+    } else if(integer == 45) {
+      column[[index]]="SC"
+    } else if(integer == 46) {
+      column[[index]]="SD"
+    } else if(integer == 47) {
+      column[[index]]="TN"
+    } else if(integer == 48) {
+      column[[index]]="TX"
+    } else if(integer == 49) {
+      column[[index]]="UT"
+    } else if(integer == 50) {
+      column[[index]]="VT"
+    } else if(integer == 51) {
+      column[[index]]="VA"
+    } else if(integer == 53) {
+      column[[index]]="WA"
+    } else if(integer == 54) {
+      column[[index]]="WV"
+    } else if(integer == 55) {
+      column[[index]]="WI"
+    } else if(integer == 56) {
+      column[[index]]="WY"
+    } else {
+      column[[index]]="NA"
+    }
+    index = index + 1
+  }
+  return(column)
+}
+
+hibble <- read_xpt("./raw_data/LLCP2018.XPT") %>%
+  mutate(State = fipsTranslator(`_STATE`)) %>%
+  filter(!State == "NA") %>%
+  filter(STATERE1 == 1) %>%
+  select(c(28:31,34:41,45,48:50,53,64,65,73,79,81:85,88,89,112,129,147,148,149,248,276)) %>% # Should also use weighting
+  write.table(file = "./output/States_health.csv", row.names = FALSE, sep = ",")
+```
+
+```{r healthComputations, echo = FALSE}
+read_csv("./output/States_health.csv") %>%
+  filter(GENHLTH > 0) %>%
+  filter(GENHLTH < 6) %>%
+  group_by(State) %>%
+  summarize(General_Health = mean(GENHLTH)) %>%
+  arrange(desc(General_Health))
+```
+
+```{r dsafsa}
+# State code to state string function
 ```
 
 ## Reference

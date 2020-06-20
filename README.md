@@ -20,12 +20,12 @@
 
 ## Datasets Used
 
-BRFSS 2018
-NHANES 2015-2016
-Harvard Dataverse
-Wikipedia List of US Governors
-FEC 2016 Election Results
-Google
+* BRFSS LLCP 2018
+* NHANES 2015-2016
+* Harvard Dataverse
+* Wikipedia List of US Governors
+* FEC 2016 Election Results
+* Google
 
 <br/>
 
@@ -65,6 +65,7 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * Vote Margin in 2016 Election
 * Sex of Governor
 * Party of Governor
+* BRFSS Health Data by State
 
 #### TODO
 
@@ -73,10 +74,10 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * (date) Lockdown End Date
 * (dbl) Per Capita Firearm Ownership
 * (dbl) Per Capita Whole Foods
+* (dbl) Proportion No Religion
 * (dbl) R0 by Date/State
 * (bool) Significant R0 Trend Change after Start Date (or whatever)
 * (bool) Significant R0 Trend Change after End Date (or whatever)
-* BRFSS: How common is getting flushot by state; what is average BMI by state; other conditions like prediabetes/obesity
 * NHANES: Lots of data, but not sure if any way to sort by state
 
 ---
