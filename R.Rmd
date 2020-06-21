@@ -248,7 +248,7 @@ computedStatesHealth <- states_health %>%
   filter(PHYSHLTH < 89) %>%
   mutate(PHYSHLTH = recodeHLTH(PHYSHLTH)) %>%
   summarize(Physical_Health = mean(PHYSHLTH)) %>% # 0-30; Physical Health: Average days in last month that physical health was not good
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -256,7 +256,7 @@ computedStatesHealth <- states_health %>%
   filter(MENTHLTH < 89) %>%
   mutate(MENTHLTH = recodeHLTH(MENTHLTH)) %>%
   summarize(Mental_Health = mean(MENTHLTH)) %>% # 0-30; Mental Health: Average days in last month that mental health was not good
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -264,7 +264,7 @@ computedStatesHealth <- states_health %>%
   filter(POORHLTH < 89) %>%
   mutate(POORHLTH = recodeHLTH(POORHLTH)) %>%
   summarize(Poor_Health = mean(POORHLTH)) %>% # 0-30; Poor Health: Average days in last month that poor health interferred with ADL
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 recodeBool <- function(column) {
   index = 1
@@ -283,7 +283,7 @@ computedStatesHealth <- states_health %>%
   filter(MEDCOST < 3) %>%
   mutate(MEDCOST = recodeBool(MEDCOST)) %>%
   summarize(Medical_Cost = mean(MEDCOST)) %>% # 0-1; Prohibitive Medical Cost: Proportion of state that was unable to see doctor in past year when needed due to cost of health care
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -291,7 +291,7 @@ computedStatesHealth <- states_health %>%
   filter(EXERANY2 < 3) %>%
   mutate(EXERANY2 = recodeBool(EXERANY2)) %>%
   summarize(Excercise = mean(EXERANY2)) %>% # 0-1; Exercise: Proportion of state that excercised at all in last month
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -299,7 +299,7 @@ computedStatesHealth <- states_health %>%
   filter(CVDINFR4 < 3) %>%
   mutate(CVDINFR4 = recodeBool(CVDINFR4)) %>%
   summarize(Heart_Attack = mean(CVDINFR4)) %>% # 0-1; Heart Attack: Proportion of state that has ever had a heart attack
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -307,7 +307,7 @@ computedStatesHealth <- states_health %>%
   filter(CVDCRHD4 < 3) %>%
   mutate(CVDCRHD4 = recodeBool(CVDCRHD4)) %>%
   summarize(Heart_Disease = mean(CVDCRHD4)) %>% # 0-1; Heart Disease: Proportion of state with angina or coronary heart disease
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -315,7 +315,7 @@ computedStatesHealth <- states_health %>%
   filter(CVDSTRK3 < 3) %>%
   mutate(CVDSTRK3 = recodeBool(CVDSTRK3)) %>%
   summarize(Stroke = mean(CVDSTRK3)) %>% # 0-1; Stroke: Proportion of state that has ever had a stroke
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -323,7 +323,7 @@ computedStatesHealth <- states_health %>%
   filter(ASTHMA3 < 3) %>%
   mutate(ASTHMA3 = recodeBool(ASTHMA3)) %>%
   summarize(Asthma = mean(ASTHMA3)) %>% # 0-1; Asthma: Proportion of state that has ever had asthma
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -331,7 +331,7 @@ computedStatesHealth <- states_health %>%
   filter(CHCCOPD1 < 3) %>%
   mutate(CHCCOPD1 = recodeBool(CHCCOPD1)) %>%
   summarize(COPD = mean(CHCCOPD1)) %>% # 0-1; COPD: Proportion of state that has ever had Chronic Obstructive Pulminary Disease
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
   group_by(State) %>%
@@ -339,7 +339,7 @@ computedStatesHealth <- states_health %>%
   filter(CHCKDNY1 < 3) %>%
   mutate(CHCKDNY1 = recodeBool(CHCKDNY1)) %>%
   summarize(Kidney_Disease = mean(CHCKDNY1)) %>% # 0-1; Kidney Disease: Proportion of state that has ever had Kidney Disease
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
 
 recodeDiabetes <- function(column) {
   index = 1
@@ -362,7 +362,112 @@ computedStatesHealth <- states_health %>%
   filter(DIABETE3 < 5) %>%
   mutate(DIABETE3 = recodeDiabetes(DIABETE3)) %>%
   summarize(Diabetes = mean(DIABETE3)) %>% # 0-1; Prediabetes/Diabetes: Proportion of state that has ever had Prediabetes/Diabetes
-  left_join(computedStatesHealth, by = "State")
+  right_join(computedStatesHealth, by = "State")
+
+# Risk Behavior Goes Here
+
+computeBMI <- function(height, weight) {
+  index = 1
+  for(element in weight) {
+    height[[index]] = (height[[index]] - (height[[index]] %% 100)) * (12 / 100) + (height[[index]] %% 100)
+    weight[[index]] = 703 * element / (height[[index]] * height[[index]])
+    index = index + 1
+  }
+  return(weight)
+}
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(WEIGHT2 > 49) %>%
+  filter(WEIGHT2 < 1000) %>% # ignores metric respondants
+  filter(HEIGHT3 > 199) %>%
+  filter(HEIGHT3 < 800) %>% # ignores metric respondants
+  mutate(BMI = computeBMI(HEIGHT3, WEIGHT2)) %>%
+  summarize(BMI = mean(BMI)) %>% # BMI: Average BMI of the state
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(SMOKE100 > 0) %>%
+  filter(SMOKE100 < 3) %>%
+  mutate(SMOKE100 = recodeBool(SMOKE100)) %>%
+  summarize(Smoker = mean(SMOKE100)) %>% # 0-1; Smokers: Proportion of state that has ever smoked at least 100 cigarettes
+  right_join(computedStatesHealth, by = "State")
+
+recodeDrinks <- function(column) {
+  index = 1
+  for(element in column) {
+    if(element == 88) {
+      column[[index]] = 0
+    }
+    index = index + 1
+  }
+  return(column)
+}
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(AVEDRNK2 > 0) %>%
+  filter(AVEDRNK2 < 78) %>%
+  mutate(AVEDRNK2 = recodeDrinks(AVEDRNK2)) %>%
+  summarize(Average_Alcohol = mean(AVEDRNK2)) %>% # Alcohol Use: Average daily alcohol intake
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(MAXDRNKS > 0) %>%
+  filter(MAXDRNKS < 78) %>%
+  mutate(MAXDRNKS = recodeDrinks(MAXDRNKS)) %>%
+  summarize(Maximum_Alcohol = mean(MAXDRNKS)) %>% # Alcohol Use: Average maximum single sitting alcohol intake
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(FLUSHOT6 > 0) %>%
+  filter(FLUSHOT6 < 3) %>%
+  mutate(FLUSHOT6 = recodeBool(FLUSHOT6)) %>%
+  summarize(Flu_Shot = mean(FLUSHOT6)) %>% # 0-1; Vaccine: Proportion of state that was vaccinated against flu in past year
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(PNEUVAC4 > 0) %>%
+  filter(PNEUVAC4 < 3) %>%
+  mutate(PNEUVAC4 = recodeBool(PNEUVAC4)) %>%
+  summarize(Pneumonia_Vaccine = mean(PNEUVAC4)) %>% # 0-1; Vaccine: Proportion of state that was ever vaccinated against pneumonia
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(SEATBELT > 0) %>%
+  filter(SEATBELT < 6) %>%
+  summarize(Seatbelt = mean(SEATBELT)) %>% # 1-5; Seatbelt: 1 Always, 5 Never
+  right_join(computedStatesHealth, by = "State")
+
+recodeDriving <- function(column) {
+  index = 1
+  for(element in column) {
+    if(element > 76) {
+      column[[index]] = 0
+    }
+    index = index + 1
+  }
+  return(column)
+}
+
+computedStatesHealth <- states_health %>%
+  group_by(State) %>%
+  filter(DRNKDRI2 > 0) %>%
+  filter(DRNKDRI2 < 89) %>%
+  mutate(DRNKDRI2 = recodeDriving(DRNKDRI2)) %>%
+  summarize(Drunk_Driving = mean(DRNKDRI2)) %>% # Drunk Driving: Average times driven while drunk in past month
+  right_join(computedStatesHealth, by = "State")
+
+computedStatesHealth %>%
+  right_join(read_csv("./output/States_info.csv"), by = "State") %>%
+  select(-c(Trump, Clinton)) %>%
+	write.table(file = "./output/States_data.csv", row.names = FALSE, sep = ",")
+  
 ```
 
 ```{r dsafsa}
