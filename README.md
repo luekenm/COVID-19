@@ -66,6 +66,7 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * Sex of Governor
 * Party of Governor
 * BRFSS Health Data by State
+* Pew Irreligion Data by State
 
 #### TODO
 
@@ -74,7 +75,6 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * (date) Lockdown End Date
 * (dbl) Per Capita Firearm Ownership
 * (dbl) Per Capita Whole Foods
-* (dbl) Proportion No Religion
 * (dbl) R0 by Date/State
 * (bool) Significant R0 Trend Change after Start Date (or whatever)
 * (bool) Significant R0 Trend Change after End Date (or whatever)

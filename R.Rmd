@@ -19,19 +19,30 @@ library(haven)
 if(!file.exists("./raw_data/States-Cases.tsv")) {
   wget(url = "https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/HIDLTK/ROCWVZ", destfile = "./raw_data/States-Cases.tsv")
 }
+
 if(!file.exists("./raw_data/States-Deaths.tsv")) {
   wget(url = "https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/HIDLTK/DOK6EK", destfile = "./raw_data/States-Deaths.tsv")
 }
+
 if(!file.exists("./raw_data/States-Votes.xlsx")) {
   wget(url = "https://www.fec.gov/documents/1890/federalelections2016.xlsx", destfile = "./raw_data/States-Votes.xlsx", compression=none) # Gives corrupted file for some reason, manual download works fine
 }
+
 if(!file.exists("./raw_data/States-Governors.csv")) {
   wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
 }
+
 if(!file.exists("./raw_data/LLCP2018.XPT")) {
   wget(url = "https://www.cdc.gov/brfss/annual_data/2018/files/LLCP2018XPT.zip", destfile = "./raw_data/LLCP2018XPT.zip")
   unzip("./raw_data/LLCP2018XPT.zip", exdir = "./raw_data")
   unlink("./raw_data/LLCP2018XPT.zip")
+}
+
+if(!file.exists("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav")) {
+  wget(url = "https://www.pewforum.org/wp-content/uploads/sites/7/2016/12/Pew-Research-Center-2014-U.S.-Religious-Landscape-Study.zip", destfile = "./raw_data/Pew-Research-Center-2014-U.S.-Religious-Landscape-Study.zip")
+  unzip("./raw_data/Pew-Research-Center-2014-U.S.-Religious-Landscape-Study.zip", exdir = "./raw_data")
+  unlink("./raw_data/Pew-Research-Center-2014-U.S.-Religious-Landscape-Study.zip")
+  unlink("./raw_data/Codebook - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.pdf")
 }
 ```
 
@@ -214,7 +225,7 @@ fipsTranslator <- function(column) {
   return(column)
 }
 
-hibble <- read_xpt("./raw_data/LLCP2018.XPT") %>%
+read_xpt("./raw_data/LLCP2018.XPT") %>%
   mutate(State = fipsTranslator(`_STATE`)) %>%
   filter(!State == "NA") %>%
   filter(STATERE1 == 1) %>%
@@ -472,6 +483,63 @@ computedStatesHealth %>%
 
 ```{r dsafsa}
 # State code to state string function
+```
+
+```{r religionData, echo = FALSE, message = FALSE}
+recodeNone <- function(religion) {
+  index = 1
+  for(element in religion) {
+    if(element == 9 | element == 10 | element == 12) {
+      religion[[index]] = 0
+    } else if(element > 0 & element < 100) {
+      religion[[index]] = 1
+    } else {
+      religion[[index]] = 2
+    }
+    index = index + 1
+  }
+  return(religion)
+}
+
+tibbie <- read_sav("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav") %>%
+  select(c(state, WEIGHT, qe1, qg1)) %>%
+  rename(State = state, Religion = qe1, God = qg1, Weight = WEIGHT) %>%
+  mutate(State = fipsTranslator(as.numeric(State))) %>%
+  mutate(Religion = recodeNone(Religion)) %>%
+  filter(!(Religion == 2)) %>%
+  filter(God == 1 | God == 2) %>%
+  mutate(God = recodeBool(God)) %>%
+  group_by(State)
+
+totalWeight <- tibbie %>%
+  summarize(Total_Weight = sum(Weight)) %>%
+  distinct()
+
+totalReligionWeight <- tibbie %>%
+  right_join(totalWeight) %>%
+  mutate(Religion_Weight = Religion * Weight) %>%
+  summarize(Total_Religion_Weight = sum(Religion_Weight)) %>%
+  distinct()
+
+totalGodWeight <- tibbie %>%
+  right_join(totalWeight) %>%
+  mutate(God_Weight = God * Weight) %>%
+  summarize(Total_God_Weight = sum(God_Weight)) %>%
+  distinct()
+
+proportionNone <- totalReligionWeight %>%
+  right_join(totalWeight) %>%
+  transmute(State, Proportion_None = (Total_Weight - Total_Religion_Weight) / Total_Weight) # These values are off by +- 2% of the official cross tabs given by Pew, but clearly this roundabout way of weighting is "relatively" accurate
+
+proportionNoGod <- totalGodWeight %>%
+  right_join(totalWeight) %>%
+  transmute(State, Proportion_NoGod = (Total_Weight - Total_God_Weight) / Total_Weight) # These values appear to be "exactly" the same as the official cross tabs. How the same procedure can exist in a quantum state of correctly and incorrectly weighting is left as an excercise to the reader.
+
+read_csv("./output/States_info.csv") %>%
+  right_join(proportionNone) %>%
+  right_join(proportionNoGod) %>%
+	write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
+  
 ```
 
 ## Reference
