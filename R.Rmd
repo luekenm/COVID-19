@@ -44,6 +44,14 @@ if(!file.exists("./raw_data/Dataset - Pew Research Center 2014 Religious Landsca
   unlink("./raw_data/Pew-Research-Center-2014-U.S.-Religious-Landscape-Study.zip")
   unlink("./raw_data/Codebook - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.pdf")
 }
+
+if(!file.exists("./raw_data/States-WholeFoods.csv")) {
+  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-WholeFoods.csv", destfile = "./raw_data/States-WholeFoods.csv")
+}
+
+if(!file.exists("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv")) {
+  wget(url = "https://docs.google.com/spreadsheets/d/1W4H2qa2THM1ni53QYZftGob_k_Bf9HreFAtCERfjCIU/export?format=csv&id=1W4H2qa2THM1ni53QYZftGob_k_Bf9HreFAtCERfjCIU&gid=534759525", destfile = "./raw_data/Whose Heritage SF - Symbol Type Count by State.csv")
+}
 ```
 
 ```{r covidData, echo = FALSE, message = FALSE}
@@ -481,8 +489,118 @@ computedStatesHealth %>%
   
 ```
 
-```{r dsafsa}
+```{r stateToString, echo = FALSE}
 # State code to state string function
+stateToString <- function(column) {
+  index = 1
+  for(stateCode in column) {
+    if(stateCode == "AL") {
+      column[[index]] = "Alabama"
+    } else if(stateCode == "AK") {
+      column[[index]] = "Alaska"
+    } else if(stateCode == "AZ") {
+      column[[index]] = "Arizona"
+    } else if(stateCode == "AR") {
+      column[[index]] = "Arkansas"
+    } else if(stateCode == "CA") {
+      column[[index]] = "California"
+    } else if(stateCode == "CO") {
+      column[[index]] = "Colorado"
+    } else if(stateCode == "CT") {
+      column[[index]] = "Connecticut"
+    } else if(stateCode == "DE") {
+      column[[index]] = "Delaware"
+    } else if(stateCode == "DC") {
+      column[[index]] = "District of Columbia"
+    } else if(stateCode == "FL") {
+      column[[index]] = "Florida"
+    } else if(stateCode == "GA") {
+      column[[index]] = "Georgia"
+    } else if(stateCode == "HI") {
+      column[[index]] = "Hawaii"
+    } else if(stateCode == "ID") {
+      column[[index]] = "Idaho"
+    } else if(stateCode == "IL") {
+      column[[index]] = "Illinois"
+    } else if(stateCode == "IN") {
+      column[[index]] = "Indiana"
+    } else if(stateCode == "IA") {
+      column[[index]] = "Iowa"
+    } else if(stateCode == "KS") {
+      column[[index]] = "Kansas"
+    } else if(stateCode == "KY") {
+      column[[index]] = "Kentucky"
+    } else if(stateCode == "LA") {
+      column[[index]] = "Louisiana"
+    } else if(stateCode == "ME") {
+      column[[index]] = "Maine"
+    } else if(stateCode == "MD") {
+      column[[index]] = "Maryland"
+    } else if(stateCode == "MA") {
+      column[[index]] = "Massachusetts"
+    } else if(stateCode == "MI") {
+      column[[index]] = "Michigan"
+    } else if(stateCode == "MN") {
+      column[[index]] = "Minnesota"
+    } else if(stateCode == "MS") {
+      column[[index]] = "Mississippi"
+    } else if(stateCode == "MO") {
+      column[[index]] = "Missouri"
+    } else if(stateCode == "MT") {
+      column[[index]] = "Montana"
+    } else if(stateCode == "NE") {
+      column[[index]] = "Nebraska"
+    } else if(stateCode == "NV") {
+      column[[index]] = "Nevada"
+    } else if(stateCode == "NH") {
+      column[[index]] = "New Hampshire"
+    } else if(stateCode == "NJ") {
+      column[[index]] = "New Jersey"
+    } else if(stateCode == "NM") {
+      column[[index]] = "New Mexico"
+    } else if(stateCode == "NY") {
+      column[[index]] = "New York"
+    } else if(stateCode == "NC") {
+      column[[index]] = "North Carolina"
+    } else if(stateCode == "ND") {
+      column[[index]] = "North Dakota"
+    } else if(stateCode == "OH") {
+      column[[index]] = "Ohio"
+    } else if(stateCode == "OK") {
+      column[[index]] = "Oklahoma"
+    } else if(stateCode == "OR") {
+      column[[index]] = "Oregon"
+    } else if(stateCode == "PA") {
+      column[[index]] = "Pennsylvania"
+    } else if(stateCode == "RI") {
+      column[[index]] = "Rhode Island"
+    } else if(stateCode == "SC") {
+      column[[index]] = "South Carolina"
+    } else if(stateCode == "SD") {
+      column[[index]] = "South Dakota"
+    } else if(stateCode == "TN") {
+      column[[index]] = "Tennessee"
+    } else if(stateCode == "TX") {
+      column[[index]] = "Texas"
+    } else if(stateCode == "UT") {
+      column[[index]] = "Utah"
+    } else if(stateCode == "VT") {
+      column[[index]] = "Vermont"
+    } else if(stateCode == "VA") {
+      column[[index]] = "Virginia"
+    } else if(stateCode == "WA") {
+      column[[index]] = "Washington"
+    } else if(stateCode == "WV") {
+      column[[index]] = "West Virginia"
+    } else if(stateCode == "WI") {
+      column[[index]] = "Wisconsin"
+    } else if(stateCode == "WY") {
+      column[[index]] = "Wyoming"
+    }
+    index = index + 1
+  }
+  return(column)
+}
 ```
 
 ```{r religionData, echo = FALSE, message = FALSE}
@@ -539,7 +657,67 @@ read_csv("./output/States_info.csv") %>%
   right_join(proportionNone) %>%
   right_join(proportionNoGod) %>%
 	write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
-  
+```
+
+```{r confederateData, echo = FALSE, message = FALSE, warning = FALSE}
+monuments <- read_csv("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv") %>%
+  slice(2:36) %>%
+  select("COUNTA of feature_name", X14) %>%
+  rename(State = "COUNTA of feature_name", Monuments = X14) %>%
+  mutate(State = stateToString(State)) %>%
+  group_by(State) %>%
+  filter(!is.na(Monuments)) %>%
+  mutate(Monuments = as.numeric(Monuments))
+
+monuments$Monuments[[8]] = monuments$Monuments[[8]] + monuments$Monuments[[9]] # duplicate Georgia in dataset
+
+pop <- read_csv("./output/States_COVID_data_by_date.csv") %>%
+  select(c(State, Population)) %>%
+  distinct()
+
+zero <- function(column) {
+  index = 1
+  for(element in column) {
+    if(is.na(element)) {
+      column[[index]] = 0
+    }
+    index = index + 1
+  }
+  return(column)
+}
+
+monuments <- monuments %>%
+  top_n(1, Monuments) %>%
+  right_join(pop) %>%
+  transmute(State, Per_Capita_Monuments = Monuments / Population) %>%
+  mutate(Per_Capita_Monuments = zero(Per_Capita_Monuments))
+
+read_csv("./output/States_info.csv") %>%
+  mutate(State = stateToString(State)) %>%
+  select(-c(Trump,Clinton)) %>%
+  right_join(monuments) %>%
+	write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
+```
+
+```{r wholeFoodsData, echo = FALSE, message = FALSE}
+perCap <- read_csv("./raw_data/States-WholeFoods.csv") %>%
+  mutate(State = stateToString(State)) %>%
+  right_join(pop) %>%
+  transmute(State, Per_Capita_Whole_Foods = Number_Whole_Foods / Population)
+
+read_csv("./output/States_info.csv") %>%
+  mutate(State = stateToString(State)) %>%
+  right_join(perCap) %>%
+	write.table(file = "./output/States_info.csv", row.names = FALSE, sep = ",")
+```
+
+```{r combineData, echo = FALSE, message = FALSE}
+tibbs <- read_csv("./output/States_info.csv")
+
+read_csv("./output/States_data.csv") %>%
+  mutate(State = stateToString(State)) %>%
+  right_join(tibbs) %>%
+  write.table(file = "./output/States_total_info.csv", row.names = FALSE, sep = ",")
 ```
 
 ## Reference

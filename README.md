@@ -26,6 +26,8 @@
 * Wikipedia List of US Governors
 * FEC 2016 Election Results
 * Google
+* Pew Religious Landscape Survey
+* Whole Foods Store Finder
 
 <br/>
 
@@ -67,14 +69,22 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * Party of Governor
 * BRFSS Health Data by State
 * Pew Irreligion Data by State
+* Number of Whole Foods per State (manually scraped)
+* Per Capita Whole Foods
 
 #### TODO
 
-* (bool) Lockdown
-* (date) Lockdown Start Date
-* (date) Lockdown End Date
+* (dbl) Population Density by State
+* (dbl) Proportion of State with Graduate/Professional Degree
+* (dbl) Hate Crimes per Capita by State
+* (date) Date of 100 Deaths by State
+* (bool) Lockdown Start
+* (bool) Lockdown End
+* (date) Lockdown Start Date by State
+* (date) Lockdown End Date by State
+* (dbl) D-Lockdown-Start - D-100-Deaths = ?
 * (dbl) Per Capita Firearm Ownership
-* (dbl) Per Capita Whole Foods
+* (dbl) Per Capita Confederate Monuments
 * (dbl) R0 by Date/State
 * (bool) Significant R0 Trend Change after Start Date (or whatever)
 * (bool) Significant R0 Trend Change after End Date (or whatever)
