@@ -71,6 +71,7 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * Pew Irreligion Data by State
 * Number of Whole Foods per State (manually scraped)
 * Per Capita Whole Foods
+* Per Capita Confederate Monuments
 
 #### TODO
 
@@ -84,7 +85,6 @@ The completed project files can be accessed online at GitHub.com/luekenm/COVID-1
 * (date) Lockdown End Date by State
 * (dbl) D-Lockdown-Start - D-100-Deaths = ?
 * (dbl) Per Capita Firearm Ownership
-* (dbl) Per Capita Confederate Monuments
 * (dbl) R0 by Date/State
 * (bool) Significant R0 Trend Change after Start Date (or whatever)
 * (bool) Significant R0 Trend Change after End Date (or whatever)
