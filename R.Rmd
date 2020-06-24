@@ -309,7 +309,7 @@ computedStatesHealth <- states_health %>%
   filter(EXERANY2 > 0) %>%
   filter(EXERANY2 < 3) %>%
   mutate(EXERANY2 = recodeBool(EXERANY2)) %>%
-  summarize(Excercise = mean(EXERANY2)) %>% # 0-1; Exercise: Proportion of state that excercised at all in last month
+  summarize(Exercise = mean(EXERANY2)) %>% # 0-1; Exercise: Proportion of state that exercised at all in last month
   right_join(computedStatesHealth, by = "State")
 
 computedStatesHealth <- states_health %>%
@@ -651,7 +651,7 @@ proportionNone <- totalReligionWeight %>%
 
 proportionNoGod <- totalGodWeight %>%
   right_join(totalWeight) %>%
-  transmute(State, Proportion_NoGod = (Total_Weight - Total_God_Weight) / Total_Weight) # These values appear to be "exactly" the same as the official cross tabs. How the same procedure can exist in a quantum state of correctly and incorrectly weighting is left as an excercise to the reader.
+  transmute(State, Proportion_NoGod = (Total_Weight - Total_God_Weight) / Total_Weight) # These values appear to be "exactly" the same as the official cross tabs. How the same procedure can exist in a quantum state of correctly and incorrectly weighting is left as an exercise to the reader.
 
 read_csv("./output/States_info.csv") %>%
   right_join(proportionNone) %>%
