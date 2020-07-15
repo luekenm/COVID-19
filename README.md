@@ -200,6 +200,14 @@ Hypotheses 1a - 27e = 135 total guesses given currently imported datasets. More 
 
 <br/>
 
+## **Actual** Hypotheses
+
+* (Per capita COVID Deaths) will be significantly higher in (non-white populations) vs (white populations).
+
+* (Per capita COVID Deaths) will be significantly higher in regions with higher (obesity prevalence), (poverty) and (basal unemployment), and lower in regions with higher (access to health care) and (basal general good health).
+
+* (Elapsed time since peak of seven day average daily new COVID cases) will positively correlate with (mandatory mask orders), and negatively with (time since lockdown measures lifted).
+
 ## Datasets Used
 
 * BRFSS LLCP 2018
