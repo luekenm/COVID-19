@@ -1,12 +1,614 @@
 ---
-title: "BIOL 390: COVID-19"
+title: "COVID Race Data"
 author: "Mitch Lueken"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
-output:
-  html_document: default
-  pdf_document: default
+output: html_document
 ---
 
-```{R, setup, echo = FALSE, results = 'hide', message = FALSE, warnings = FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warnings = FALSE)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE, include = FALSE)
+
+library(tidyverse)
+library(kableExtra)
+library(HelpersMG)
+library(choroplethr)
+library(choroplethrMaps)
+library(dplyr)
+library(ggplot2)
+
+# This function makes the ggplot maps play nice with the names of counties
+source("./R/fipsCoercer.R")
 ```
+
+```{r download}
+# CDC State Race Data
+if(!file.exists("./raw_data/Provisional_Death_Counts_for_Coronavirus_Disease__COVID-19___Weekly_State-Specific_Data_Updates.csv")) {
+  wget(url = "https://data.cdc.gov/api/views/pj7m-y5uh/rows.csv", destfile = "./raw_data/Provisional_Death_Counts_for_Coronavirus_Disease__COVID-19___Weekly_State-Specific_Data_Updates.csv")
+}
+
+# CDC County Race Data
+if(!file.exists("./raw_data/Provisional_COVID-19_Death_Counts_by_County_and_Race.csv")) {
+  wget(url = "https://data.cdc.gov/api/views/k8wy-p9cg/rows.csv", destfile = "./raw_data/Provisional_COVID-19_Death_Counts_by_County_and_Race.csv")
+}
+
+# CDC Race and Age Data
+if(!file.exists("./raw_data/Deaths_involving_coronavirus_disease_2019__COVID-19__by_race_and_Hispanic_origin_group_and_age__by_state.csv")) {
+  wget(url = "https://data.cdc.gov/api/views/ks3g-spdg/rows.csv", destfile = "./raw_data/Deaths_involving_coronavirus_disease_2019__COVID-19__by_race_and_Hispanic_origin_group_and_age__by_state.csv")
+}
+
+# NY Population
+if(!file.exists("./raw_data/NY.csv")) {
+  wget(url = "https://www.census.gov/quickfacts/fact/csv/NY/PST045219",
+     destfile = "./raw_data/NY.csv")
+}
+
+# Better Census Data (Race by Age for each state)
+if(!file.exists("./raw_data/sc-est2019-alldata6.csv")) {
+    wget(url = "https://www2.census.gov/programs-surveys/popest/tables/2010-2019/state/asrh/sc-est2019-alldata6.csv",
+         destfile = "./raw_data/sc-est2019-alldata6.csv")
+}
+```
+
+```{r tidyNewYorkData}
+# This gives the overall proportion of the entire state of NY that is white, something not available in the CDC dataset
+ny_pop = read_csv("./raw_data/NY.csv") %>%
+  select(Fact, `New York`) %>%
+  filter(Fact == "White alone, not Hispanic or Latino, percent") %>%
+  transmute(pop = as.numeric(substr(`New York`, 1, 4)))
+```
+
+```{r tidyCOVIDStateData}
+# The dataset needs to be trimmed and compacted to be more useful
+data <- read_csv("./raw_data/Provisional_Death_Counts_for_Coronavirus_Disease__COVID-19___Weekly_State-Specific_Data_Updates.csv") %>%
+  select(State,
+         Indicator,
+         White = `Non-Hispanic White`,
+         Black = `Non-Hispanic Black or African American`,
+         Native = `Non-Hispanic American Indian or Alaska Native`,
+         Asian = `Non-Hispanic Asian`,
+         Hispanic = `Hispanic or Latino`,
+         Other = Other) %>%
+  filter(State != "United States" &
+         Indicator %in% c("Count of COVID-19 deaths",
+                          "Distribution of COVID-19 deaths (%)",
+                          "Unweighted distribution of population (%)")) %>%
+  mutate(White = replace_na(White, 0),
+         Black = replace_na(Black, 0),
+         Native = replace_na(Native, 0),
+         Asian = replace_na(Asian, 0),
+         Hispanic = replace_na(Hispanic, 0),
+         Other = replace_na(Other, 0)) %>%
+  mutate(`Non-White` = Black + Native + Asian + Hispanic + Other) %>%
+  select(-c(Black, Native, Asian, Hispanic, Other)) %>%
+  pivot_wider(names_from = "Indicator", values_from = c("White", "Non-White")) %>%
+  rename(White_Deaths = `White_Count of COVID-19 deaths`,
+         `Non-White_Deaths` = `Non-White_Count of COVID-19 deaths`,
+         White_Dist = `White_Distribution of COVID-19 deaths (%)`,
+         `Non-White_Dist` = `Non-White_Distribution of COVID-19 deaths (%)`,
+         White_Pop = `White_Unweighted distribution of population (%)`,
+         `Non-White_Pop` = `Non-White_Unweighted distribution of population (%)`)
+
+# NY and NYC are separated, rather than NYC being a subset, so some trickery is required
+ny <- filter(data, State == "New York")
+nyc <- filter(data, State == "New York City")
+ny$White_Pop = ny_pop[[1]]
+ny$White_Deaths = ny$White_Deaths + nyc$White_Deaths
+ny$`Non-White_Deaths` = ny$`Non-White_Deaths` + nyc$`Non-White_Deaths`
+ny$White_Dist = 100.0 * ny$White_Deaths / (ny$White_Deaths + ny$`Non-White_Deaths`)
+ny$`Non-White_Dist` = 100 - ny$White_Dist
+
+#NY and NYC removed, replaced with their combination
+filter(data, State != "New York" & State != "New York City") %>%
+  bind_rows(ny) %>%
+  write_csv("./output/cdc_state_covid_race_data.csv")
+```
+
+```{r tidyCOVIDCountyData}
+# THe county dataset also needs tidying
+read_csv("./raw_data/Provisional_COVID-19_Death_Counts_by_County_and_Race.csv") %>%
+  select(fips = `FIPS Code`,
+         Indicator,
+         Deaths = `COVID-19 Deaths Total`,
+         White = `Non-Hispanic White`,
+         Black = `Non-Hispanic Black`,
+         Native = `Non-Hispanic American Indian or Alaska Native`,
+         Asian = `Non-Hispanic Asian`,
+         Hispanic,
+         Other) %>%
+  filter(Indicator %in% c("Distribution of COVID-19 deaths (%)",
+                          "Distribution of population (%)")) %>%
+  mutate(White = replace_na(White, 0),
+         Black = replace_na(Black, 0),
+         Native = replace_na(Native, 0),
+         Asian = replace_na(Asian, 0),
+         Hispanic = replace_na(Hispanic, 0),
+         Other = replace_na(Other, 0)) %>%
+  mutate(`Non-White` = Black + Native + Asian + Hispanic + Other) %>%
+  select(-c(Black, Native, Asian, Hispanic, Other)) %>%
+  pivot_wider(names_from = "Indicator", values_from = c("White", "Non-White")) %>%
+  rename(White_Dist = `White_Distribution of COVID-19 deaths (%)`,
+         `Non-White_Dist` = `Non-White_Distribution of COVID-19 deaths (%)`,
+         White_Pop = `White_Distribution of population (%)`,
+         `Non-White_Pop` = `Non-White_Distribution of population (%)`) %>%
+  write_csv("./output/cdc_county_covid_race_data.csv")
+```
+
+```{r tidyCensusAgeRaceData}
+# Population breakdown by state by race by age
+
+# Calculate the population by age for non-hispanic white
+stateAgesWhite <- read_csv("./raw_data/sc-est2019-alldata6.csv") %>%
+  filter(SEX == 0 & ORIGIN == 1 & RACE == 1) %>%
+  select(DIVISION, NAME, AGE, POPESTIMATE2019)
+
+white0 <- stateAgesWhite %>%
+  filter(AGE == 0) %>%
+  select(DIVISION, region = NAME, `Under 1 year` = POPESTIMATE2019) %>%
+  distinct()
+
+white1_4 <- stateAgesWhite %>%
+  filter(AGE > 0 & AGE < 5) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `1-4 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white5_14 <- stateAgesWhite %>%
+  filter(AGE > 4 & AGE < 15) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `5-14 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white15_24 <- stateAgesWhite %>%
+  filter(AGE > 14 & AGE < 25) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `15-24 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white25_34 <- stateAgesWhite %>%
+  filter(AGE > 24 & AGE < 35) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `25-34 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white35_44 <- stateAgesWhite %>%
+  filter(AGE > 34 & AGE < 45) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `35-44 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white45_54 <- stateAgesWhite %>%
+  filter(AGE > 44 & AGE < 55) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `45-54 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white55_64 <- stateAgesWhite %>%
+  filter(AGE > 54 & AGE < 65) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `55-64 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white65_74 <- stateAgesWhite %>%
+  filter(AGE > 64 & AGE < 75) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `65-74 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+white75_84 <- stateAgesWhite %>%
+  filter(AGE > 74 & AGE < 85) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `75-84 years` = sum(POPESTIMATE2019)) %>%
+  rename(region = NAME) %>%
+  distinct()
+
+ageRace1 <- left_join(white0, white1_4, by = "region") %>%
+  left_join(white5_14, by = "region") %>%
+  left_join(white15_24, by = "region") %>%
+  left_join(white25_34, by = "region") %>%
+  left_join(white35_44, by = "region") %>%
+  left_join(white45_54, by = "region") %>%
+  left_join(white55_64, by = "region") %>%
+  left_join(white65_74, by = "region") %>%
+  left_join(white75_84, by = "region")
+
+# Calculate the population by age and race for anyone else
+stateAgesNon <- read_csv("./raw_data/sc-est2019-alldata6.csv") %>%
+  filter(SEX == 0 & (ORIGIN == 1 | ORIGIN == 2)) %>%
+  select(DIVISION, NAME, ORIGIN, RACE, AGE, POPESTIMATE2019)
+
+nonWhite0 <- stateAgesNon %>%
+  filter(AGE == 0) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(DIVISION, NAME, `Under 1 year` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite1_4 <- stateAgesNon %>%
+  filter(AGE > 0 & AGE < 5) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `1-4 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite5_14 <- stateAgesNon %>%
+  filter(AGE > 4 & AGE < 15) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `5-14 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite15_24 <- stateAgesNon %>%
+  filter(AGE > 14 & AGE < 25) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `15-24 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite25_34 <- stateAgesNon %>%
+  filter(AGE > 24 & AGE < 35) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `25-34 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite35_44 <- stateAgesNon %>%
+  filter(AGE > 34 & AGE < 45) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `35-44 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite45_54 <- stateAgesNon %>%
+  filter(AGE > 44 & AGE < 55) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `45-54 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite55_64 <- stateAgesNon %>%
+  filter(AGE > 54 & AGE < 65) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `55-64 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite65_74 <- stateAgesNon %>%
+  filter(AGE > 64 & AGE < 75) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `65-74 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+nonWhite75_84 <- stateAgesNon %>%
+  filter(AGE > 74 & AGE < 85) %>%
+  filter(!(ORIGIN == 1 & RACE == 1)) %>%
+  group_by(NAME) %>%
+  summarize(NAME, `75-84 years` = sum(POPESTIMATE2019)) %>%
+  distinct() %>%
+  rename(region = NAME)
+
+ageRace2 <- left_join(nonWhite0, nonWhite1_4, by = "region") %>%
+  left_join(nonWhite5_14, by = "region") %>%
+  left_join(nonWhite15_24, by = "region") %>%
+  left_join(nonWhite25_34, by = "region") %>%
+  left_join(nonWhite35_44, by = "region") %>%
+  left_join(nonWhite45_54, by = "region") %>%
+  left_join(nonWhite55_64, by = "region") %>%
+  left_join(nonWhite65_74, by = "region") %>%
+  left_join(nonWhite75_84, by = "region")
+
+# Combine everything
+ageRace3 <- ageRace1 %>% pivot_longer(-c(DIVISION, region), names_to = "age", values_to = "Pop_White")
+ageRace4 <- ageRace2 %>% pivot_longer(-c(DIVISION, region), names_to = "age", values_to = "Pop_Non-White")
+
+left_join(ageRace3, ageRace4, by = c("DIVISION", "region", "age")) %>%
+  mutate(region = tolower(region), `Prop_Non-White` = 100 * `Pop_Non-White` / (Pop_White + `Pop_Non-White`)) %>%
+  write_csv("./output/census_state_age_race_data.csv")
+```
+
+```{r tidyCOVIDAgeRaceData}
+# Tidying the age and race dataset
+data <- read_csv("./raw_data/Deaths_involving_coronavirus_disease_2019__COVID-19__by_race_and_Hispanic_origin_group_and_age__by_state.csv") %>%
+  select(region = State, age = `Age group`, race = `Race and Hispanic Origin Group`, deaths = `COVID-19 Deaths`) %>%
+  pivot_wider(names_from = race, values_from = deaths) %>%
+  rename(White = `Non-Hispanic White`,
+         Black = `Non-Hispanic Black`,
+         Native = `Non-Hispanic American Indian or Alaska Native`,
+         Asian = `Non-Hispanic Asian`,
+         Hispanic = `Hispanic or Latino`) %>%
+  mutate(White = replace_na(White, 0),
+       Black = replace_na(Black, 0),
+       Native = replace_na(Native, 0),
+       Asian = replace_na(Asian, 0),
+       Hispanic = replace_na(Hispanic, 0),
+       Unknown = replace_na(Unknown, 0)) %>%
+  mutate(`Non-White` = Black + Native + Asian + Hispanic + Unknown) %>%
+  select(region, age, White, `Non-White`) %>%
+  filter(region != "United States") %>%
+  filter(region != "puerto rico") %>%
+  mutate(region = tolower(region))
+
+# NY and NYC are AGAIN separated, rather than subsetted
+ny <- filter(data, region == "new york")
+nyc <- filter(data, region == "new york city")
+ny <- ny
+ny$White <- ny$White + nyc$White
+ny$`Non-White` <- ny$`Non-White` + nyc$`Non-White`
+
+# Calculating the proportion of deaths by race and the ratio of prop_pop to prop_death, and avoiding math problems
+filter(data, region != "new york" & region != "new york city") %>%
+  bind_rows(ny) %>%
+  right_join(read_csv("./output/census_state_age_race_data.csv"), by = c("region", "age")) %>%
+  mutate(`Deaths_Non-White` = if_else(`Non-White` == 0 & White == 0,
+                                      50.0,
+                                      if_else(`Non-White` == 0 & White != 0,
+                                              0.0,
+                                              if_else(`Non-White` != 0 & White == 0,
+                                                      100.0,
+                                                      100 * `Non-White` / (`Non-White` + White))))) %>%
+  mutate(Ratio = if_else(`Non-White` == 0 & White == 0,
+                         1.0,
+                         `Deaths_Non-White` / `Prop_Non-White`)) %>%
+  mutate(`Census Region` = if_else(DIVISION == 1,
+                                   "New England",
+                                   if_else(DIVISION == 2,
+                                           "Middle Atlantic (NY)",
+                                           if_else(DIVISION == 3,
+                                                   "East North Central (Midwest)",
+                                                   if_else(DIVISION == 4,
+                                                           "West North Central (Plains)",
+                                                           if_else(DIVISION == 5,
+                                                                   "South Atlantic (Carolinas)",
+                                                                   if_else(DIVISION == 6,
+                                                                           "East South Central (The South)",
+                                                                           if_else(DIVISION == 7,
+                                                                                   "West South Central (Tex)",
+                                                                                   if_else(DIVISION == 8,
+                                                                                           "Mountain (The West)",
+                                                                                           "Pacific"))))))))) %>%
+   mutate(ageNum = if_else(age == "Under 1 year",
+                          0.5,
+                          if_else(age == "1-4 years",
+                                  2.5,
+                                  if_else(age == "5-14 years",
+                                          10,
+                                          if_else(age == "15-24 years",
+                                                  20,
+                                                  if_else(age == "25-34 years",
+                                                          30,
+                                                          if_else(age == "35-44 years",
+                                                                  40,
+                                                                  if_else(age == "45-54 years",
+                                                                          50,
+                                                                          if_else(age == "55-64 years",
+                                                                                  60,
+                                                                                  if_else(age == "65-74 years",
+                                                                                          70,
+                                                                                          80)))))))))) %>%
+write_csv("./output/cdc_state_covid_age_race_data.csv")
+```
+
+---
+
+```{r choroplethRacePopulation, include = TRUE}
+# Map of State Non-White Pop Proportion
+pop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
+  transmute(region = tolower(State), value = `Non-White_Pop`) %>%
+  StateChoropleth$new()
+pop$title = "Proportion of Population that is not Non-Hispanic White Only"
+pop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 2, name = "Proportion of Population", drop = FALSE, na.value = "black")
+pop$show_labels = FALSE
+pop$render()
+```
+
+```{r choroplethRaceCOVID, include = TRUE}
+# Map of State Non-White Distribution of COVID Deaths
+prop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
+  transmute(region = tolower(State), value = `Non-White_Dist`) %>%
+  StateChoropleth$new()
+prop$title = "Proportion of COVID Deaths from Population that is not Non-Hispanic White Only"
+prop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 8, name = "Proportion of Deaths", drop = FALSE, na.value = "black")
+prop$show_labels = FALSE
+prop$render()
+```
+
+---
+
+```{r mapRatioState, include = TRUE}
+# A fancier ggplot map
+
+# This joins the state boundry map coords with the dataset, allowing for mapping in ggplot
+states <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
+  transmute(region = tolower(State), value = `Non-White_Dist` / `Non-White_Pop`) %>%
+  full_join(map_data("state"), by = "region")
+
+# This plots the states, filling them in based on the Ratio
+ggplot(states) +
+  geom_polygon(aes(x = long,
+                   y = lat,
+                   fill = value,
+                   group = group),
+               color = "black",
+               size = 0.25) +
+  theme_linedraw() +
+  expand_limits(x = states$long, y = states$lat) +
+  scale_fill_gradient2(name = "Ratio",
+                      low = "blue",
+                      mid = "grey",
+                      midpoint = 1.0,
+                      high = "red",
+                      na.value = "black") +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "bottom") +
+  xlab("") + ylab("") +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only State Population") +
+ggsave("./figures/ratio_state.png")
+```
+
+```{r mapRatioCounty, include = TRUE}
+# This is the same idea, but using the limited county-specific data
+
+data <- read_csv("./output/cdc_county_covid_race_data.csv") %>%
+  mutate(Ratio = `Non-White_Dist` / `Non-White_Pop`)
+
+# This convoluted code smushes the different naming schema together, and mostly they work okay, if you ignore Virginia
+data("county.regions")
+mapData <- county.regions %>%
+  transmute(fips = region, region = state.name, subregion = county.name) %>%
+  fipsCoercer() %>%
+  inner_join(map_data("county"), by = c("region", "subregion")) %>%
+  full_join(data, by = "fips")
+
+ggplot(mapData, aes(x = long,
+                    y = lat,
+                    group = group)) +
+  geom_polygon(aes(fill = Ratio), color = NA) +
+  theme_linedraw() +
+  scale_fill_gradient2(name = "Ratio",
+                      low = "blue",
+                      mid = "grey",
+                      high = "red",
+                      midpoint = 1,
+                      na.value = "black") +
+  expand_limits(x = mapData$long, y = mapData$lat) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "bottom") +
+  xlab("") + ylab("") +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only County Population") +
+  coord_map()
+ggsave("./figures/ratio_county.png")
+```
+
+---
+
+```{r plotCOVIDAgeRaceCensusRegion, include = TRUE}
+# Plots Ratio by Census Region
+read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
+  group_by(`Census Region`, ageNum) %>%
+  summarize(ageNum, pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  distinct() %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  ggplot(aes(x = ageNum, y = pop_avg, color = `Census Region`)) +
+  geom_line(size = 2) +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only Census Region Population",
+       x = "Age",
+       y = "Ratio") +
+  theme_linedraw() +
+  ylim(0, 4)
+```
+
+```{r plotCOVIDStates, include = TRUE}
+# Plots Ratio by State, grouped by Census Region
+read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
+  group_by(region, ageNum) %>%
+  summarize(`Census Region`, pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  ggplot(aes(x = ageNum, y = pop_avg, color = region)) +
+  geom_line(size = 1.5) +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only State Population\nBy 10-Year Age Group Midpoint Grouped by Census Region",
+       x = "Age",
+       y = "Ratio") +
+  theme_linedraw() +
+  facet_grid(`Census Region` ~ .)
+```
+
+```{r tableCOVIDAgeState, include = TRUE}
+# As a table
+data("state.regions")
+
+knitr::kable(read_csv("./raw_data/States-Governors.csv") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  select(region, Gov_Male, Gov_Rep) %>%
+  right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
+  group_by(region, age) %>%
+  summarize(Gov_Male, Gov_Rep, pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  pivot_wider(names_from = age, values_from = pop_avg) %>%
+  mutate(`Governor Sex` = if_else(Gov_Male, "Male", "Female"),
+         `Governor Party` = if_else(Gov_Rep, "Republican", "Democrat"),
+         State = paste(toupper(substring(strsplit(region, " ")[[1]], 1,1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " ")) %>%
+  mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
+  transmute(State,
+            `Governor Party`,
+            `Governor Sex`,
+            `15-24 years` = round(`15-24 years`, 2),
+            `25-34 years` = round(`25-34 years`, 2),
+            `35-44 years` = round(`35-44 years`, 2),
+            `45-54 years` = round(`45-54 years`, 2),
+            `55-64 years` = round(`55-64 years`, 2),
+            `65-74 years` = round(`65-74 years`, 2),
+            `75-84 years` = round(`75-84 years`, 2)) %>%
+  ungroup() %>%
+  select(-region))
+```
+
+---
+
+```{r plotCOVIDGovernorSex, include = TRUE, fig.cap = "**Figure**"}
+# By Governor Sex
+read_csv("./raw_data/States-Governors.csv") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  select(region, Gov_Male) %>%
+  right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
+  group_by(ageNum, Gov_Male) %>%
+  summarize(pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  ggplot(aes(x = ageNum, y = pop_avg, color = Gov_Male)) +
+  geom_line(size = 3) +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only Population\nBy 10-Year Age Group Midpoint Grouped by Governor Sex",
+       x = "Age",
+       y = "Ratio") +
+  scale_color_discrete(name = "Governor Sex",
+                       labels = c("Female", "Male")) +
+  theme_linedraw()
+```
+
+```{r plotCOVIDGovernorParty, include = TRUE}
+# By Governor Party
+read_csv("./raw_data/States-Governors.csv") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  select(region, Gov_Rep) %>%
+  right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
+  group_by(ageNum, Gov_Rep) %>%
+  summarize(pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  ggplot(aes(x = ageNum, y = pop_avg, color = !Gov_Rep)) +
+  geom_line(size = 3) +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only Population\nBy 10-Year Age Group Midpoint Grouped by Governor Party",
+       x = "Age",
+       y = "Ratio") +
+  scale_color_discrete(name = "Governor Party",
+                       labels = c("Republican", "Democrat")) +
+  theme_linedraw()
+```
+
+---
+
+# TODO
+
+Include Census Region Map and download
+Download GovInfo
+
+State x Region needs much much taller, width okay, legend needs cap editing
+Table needs slight padding, some cell outlines
