@@ -35,10 +35,6 @@ vignettes/*.pdf
 *.utf8.md
 *.knit.md
 
-output/States_data.csv
-output/States_info.csv
-raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav
-raw_data/Whose Heritage SF - Symbol Type Count by State.csv
-raw_data/LLCP2018.XPT
-output/States_total_info.csv
-output/States_monuments.csv
+output
+raw_data
+figures

@@ -47,6 +47,13 @@ if(!file.exists("./raw_data/sc-est2019-alldata6.csv")) {
     wget(url = "https://www2.census.gov/programs-surveys/popest/tables/2010-2019/state/asrh/sc-est2019-alldata6.csv",
          destfile = "./raw_data/sc-est2019-alldata6.csv")
 }
+
+# BRFSS
+if(!file.exists("./raw_data/LLCP2018.XPT")) {
+  wget(url = "https://www.cdc.gov/brfss/annual_data/2018/files/LLCP2018XPT.zip", destfile = "./raw_data/LLCP2018XPT.zip")
+  unzip("./raw_data/LLCP2018XPT.zip", exdir = "./raw_data")
+  unlink("./raw_data/LLCP2018XPT.zip")
+}
 ```
 
 ```{r tidyNewYorkData}
@@ -403,6 +410,100 @@ filter(data, region != "new york" & region != "new york city") %>%
                                                                                           70,
                                                                                           80)))))))))) %>%
 write_csv("./output/cdc_state_covid_age_race_data.csv")
+```
+
+```{r tidyBRFSSData}
+data("state.regions")
+select(state.regions, region, `_STATE` = fips.numeric) %>%
+  left_join(read_xpt("./raw_data/LLCP2018.XPT"), by = "_STATE") %>%
+  select(weight = `_LLCPWT`, #Statistical Raking Weight
+      	 region, # State
+      	 race = `_RACEG21`, #1 Non-Hispanic White, 2 Other, 9 NA
+      	 bmi = `_BMI5`, #BMI; BMI * 100
+      	 cost_doctor = MEDCOST, # Unable to see doctor for cost in year; 1 Yes, 2 No, 7/9 NA
+      	 infarction = CVDINFR4, # Ever had heart attack; 1 Yes, 2 No, 7/9 NA
+      	 stroke = CVDSTRK3, # Ever had stroke; 1 Yes, 2 No, 7/9 NA
+      	 asthma = ASTHMA3, # Ever had asthma; 1 Yes, 2 No, 7/9 NA
+      	 copd = CHCCOPD1, # Ever had COPD; 1 Yes, 2 No, 7/9 NA
+      	 kidney = CHCKDNY1, # Ever had kidney disease; 1 Yes, 2 No, 7/9 NA
+      	 brimley = DIABETE3, # Ever had diabetes; 1 Yes, 4 Prediabetes, 2/3 No, 7/9 NA
+      	 smoker = SMOKE100, # Ever smoked at least 100 cigs; 1 Yes, 2 No, 7/9 NA
+      	 flu = FLUSHOT6, # Flu shot in last year; 1 Yes, 2 No, 7/9 NA
+      	 vax = PNEUVAC4 # Ever had pneumonia vaccine; 1 Yes, 2 No, 7/9 NA
+  	) %>%
+  write_csv("./output/BRFSS.csv")
+```
+
+---
+
+```{r manipulateBRFSSData}
+BRFSS <- read_csv("./output/BRFSS.csv")
+
+# Calculating Proportion of State that is not Non-Hispanic White
+white <- group_by(BRFSS, region) %>%
+  filter(race == 1) %>%
+  summarize(whites = sum(weight))
+other <- group_by(BRFSS, region) %>%
+  filter(race == 2) %>%
+  summarize(others = sum(weight))
+prop_other <- left_join(white, other, by = "region") %>%
+  mutate(prop_others = others / (whites + others)) %>%
+  select(region, prop_others)
+rm(white, other)
+
+# Calculating Average BMI
+average_bmi <- group_by(BRFSS, region) %>%
+  filter(!is.na(bmi)) %>%
+  summarize(avg_bmi = sum(weight * bmi) / (100 * sum(weight)))
+
+# Calculating Proportion of overweight (including obese) population (BMI >= 25.00)
+weight_over <- group_by(BRFSS, region) %>%
+  filter(!is.na(bmi) & bmi >= 2500) %>%
+  summarize(overweight = sum(weight))
+weight_not_over <- group_by(BRFSS, region) %>%
+  filter(!is.na(bmi) & bmi < 2500) %>%
+  summarize(not_overweight = sum(weight))
+prop_over <- left_join(weight_over, weight_not_over, by = "region") %>%
+  mutate(prop_overweight = overweight / (overweight + not_overweight)) %>%
+  select(region, prop_overweight)
+rm(weight_over, weight_not_over)
+
+# Calculating Proportion of obese population (BMI >= 30.00)
+weight_ob <- group_by(BRFSS, region) %>%
+  filter(!is.na(bmi) & bmi >= 3000) %>%
+  summarize(obese = sum(weight))
+weight_not_ob <- group_by(BRFSS, region) %>%
+  filter(!is.na(bmi) & bmi < 3000) %>%
+  summarize(not_obese = sum(weight))
+prop_ob <- left_join(weight_ob, weight_not_ob, by = "region") %>%
+  mutate(prop_obese = obese / (obese + not_obese)) %>%
+  select(region, prop_obese)
+rm(weight_ob, weight_not_ob)
+
+# Calculating Proportion of State that has been unable to visit doctor because of cost
+cost_doc_yes <- group_by(BRFSS, region) %>%
+  filter(cost_doctor == 1) %>%
+  summarize(cost_doctor_yes = sum(weight))
+cost_doc_no <- group_by(BRFSS, region) %>%
+  filter(cost_doctor == 2) %>%
+  summarize(cost_doctor_no = sum(weight))
+prop_cost_doc <- left_join(cost_doc_yes, cost_doc_no, by = "region") %>%
+  mutate(prop_cost_doctor = cost_doctor_yes / (cost_doctor_yes + cost_doctor_no)) %>%
+  select(region, prop_cost_doctor)
+rm(cost_doc_yes, cost_doc_no)
+
+# Calculating Proportion of State that has had a heart attack
+infarc_yes <- group_by(BRFSS, region) %>%
+  filter(infarction == 1) %>%
+  summarize(infarction_yes = sum(weight))
+infarc_no <- group_by(BRFSS, region) %>%
+  filter(infarction == 2) %>%
+  summarize(infarction_no = sum(weight))
+prop_infarc <- left_join(infarc_yes, infarc_no, by = "region") %>%
+  mutate(prop_infarction = infarction_yes / (infarction_yes + infarction_no)) %>%
+  select(region, prop_infarction)
+rm(infarc_yes, infarc_no)
+
 ```
 
 ---
