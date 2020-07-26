@@ -1,5 +1,5 @@
 ---
-title: "COVID Race Data"
+title: "COVID Health and Race Trends"
 author: "Mitch Lueken"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
@@ -15,6 +15,8 @@ library(choroplethr)
 library(choroplethrMaps)
 library(dplyr)
 library(ggplot2)
+library(readxl)
+library(haven)
 
 # This function makes the ggplot maps play nice with the names of counties
 source("./R/fipsCoercer.R")
@@ -58,7 +60,7 @@ if(!file.exists("./raw_data/LLCP2018.XPT")) {
 
 ```{r tidyNewYorkData}
 # This gives the overall proportion of the entire state of NY that is white, something not available in the CDC dataset
-ny_pop = read_csv("./raw_data/NY.csv") %>%
+ny_pop <- read_csv("./raw_data/NY.csv") %>%
   select(Fact, `New York`) %>%
   filter(Fact == "White alone, not Hispanic or Latino, percent") %>%
   transmute(pop = as.numeric(substr(`New York`, 1, 4)))
@@ -108,10 +110,12 @@ ny$`Non-White_Dist` = 100 - ny$White_Dist
 filter(data, State != "New York" & State != "New York City") %>%
   bind_rows(ny) %>%
   write_csv("./output/cdc_state_covid_race_data.csv")
+
+rm(ny, nyc)
 ```
 
 ```{r tidyCOVIDCountyData}
-# THe county dataset also needs tidying
+# The county dataset also needs tidying
 read_csv("./raw_data/Provisional_COVID-19_Death_Counts_by_County_and_Race.csv") %>%
   select(fips = `FIPS Code`,
          Indicator,
@@ -328,6 +332,11 @@ ageRace4 <- ageRace2 %>% pivot_longer(-c(DIVISION, region), names_to = "age", va
 left_join(ageRace3, ageRace4, by = c("DIVISION", "region", "age")) %>%
   mutate(region = tolower(region), `Prop_Non-White` = 100 * `Pop_Non-White` / (Pop_White + `Pop_Non-White`)) %>%
   write_csv("./output/census_state_age_race_data.csv")
+
+rm(white0, white1_4, white5_14, white15_24, white25_34, white35_44, white45_54, white55_64, white65_74, white75_84)
+rm(nonWhite0, nonWhite1_4, nonWhite5_14, nonWhite15_24, nonWhite25_34, nonWhite35_44, nonWhite45_54, nonWhite55_64, nonWhite65_74, nonWhite75_84)
+rm(ageRace1, ageRace2, ageRace3, ageRace4)
+rm(stateAgesWhite, stateAgesNon)
 ```
 
 ```{r tidyCOVIDAgeRaceData}
@@ -410,6 +419,8 @@ filter(data, region != "new york" & region != "new york city") %>%
                                                                                           70,
                                                                                           80)))))))))) %>%
 write_csv("./output/cdc_state_covid_age_race_data.csv")
+
+rm(ny, nyc)
 ```
 
 ```{r tidyBRFSSData}
@@ -435,6 +446,16 @@ select(state.regions, region, `_STATE` = fips.numeric) %>%
 ```
 
 ---
+
+## Introduction
+
+Here go words about what is to follow.
+
+\
+
+---
+
+\
 
 ```{r manipulateBRFSSData}
 BRFSS <- read_csv("./output/BRFSS.csv")
@@ -504,9 +525,154 @@ prop_infarc <- left_join(infarc_yes, infarc_no, by = "region") %>%
   select(region, prop_infarction)
 rm(infarc_yes, infarc_no)
 
+# Calculating Proportion of State that has had a stroke
+cva_yes <- group_by(BRFSS, region) %>%
+  filter(stroke == 1) %>%
+  summarize(stroke_yes = sum(weight))
+cva_no <- group_by(BRFSS, region) %>%
+  filter(stroke == 2) %>%
+  summarize(stroke_no = sum(weight))
+prop_cva <- left_join(cva_yes, cva_no, by = "region") %>%
+  mutate(prop_stroke = stroke_yes / (stroke_yes + stroke_no)) %>%
+  select(region, prop_stroke)
+rm(cva_yes, cva_no)
+
+# Calculating Proportion of State that has had asthma
+atmen_yes <- group_by(BRFSS, region) %>%
+  filter(asthma == 1) %>%
+  summarize(asthma_yes = sum(weight))
+atmen_no <- group_by(BRFSS, region) %>%
+  filter(asthma == 2) %>%
+  summarize(asthma_no = sum(weight))
+prop_atmen <- left_join(atmen_yes, atmen_no, by = "region") %>%
+  mutate(prop_asthma = asthma_yes / (asthma_yes + asthma_no)) %>%
+  select(region, prop_asthma)
+rm(atmen_yes, atmen_no)
+
+# Calculating Proportion of State that has had COPD
+lungs_yes <- group_by(BRFSS, region) %>%
+  filter(copd == 1) %>%
+  summarize(copd_yes = sum(weight))
+lungs_no <- group_by(BRFSS, region) %>%
+  filter(copd == 2) %>%
+  summarize(copd_no = sum(weight))
+prop_lungs <- left_join(lungs_yes, lungs_no, by = "region") %>%
+  mutate(prop_copd = copd_yes / (copd_yes + copd_no)) %>%
+  select(region, prop_copd)
+rm(lungs_yes, lungs_no)
+
+# Calculating Proportion of State that has had Chronic Kidney Disease
+kid_yes <- group_by(BRFSS, region) %>%
+  filter(kidney == 1) %>%
+  summarize(kidney_yes = sum(weight))
+kid_no <- group_by(BRFSS, region) %>%
+  filter(kidney == 2) %>%
+  summarize(kidney_no = sum(weight))
+prop_kid <- left_join(kid_yes, kid_no, by = "region") %>%
+  mutate(prop_kidney = kidney_yes / (kidney_yes + kidney_no)) %>%
+  select(region, prop_kidney)
+rm(kid_yes, kid_no)
+
+# Calculating Proportion of State that has Diabetes (Excluding Gestational Diabetes) 1 4 23
+beetus_yes <- group_by(BRFSS, region) %>%
+  filter(brimley == 1) %>%
+  summarize(diabetes_yes = sum(weight))
+beetus_no <- group_by(BRFSS, region) %>%
+  filter(brimley == 2 | brimley == 3 | brimley == 4) %>%
+  summarize(diabetes_no = sum(weight))
+beetus_pre <- group_by(BRFSS, region) %>%
+  filter(brimley == 1 | brimley == 4) %>%
+  summarize(prediabetes_yes = sum(weight))
+beetus_none <- group_by(BRFSS, region) %>%
+  filter(brimley == 2 | brimley == 3) %>%
+  summarize(prediabetes_no = sum(weight))
+prop_beetus <- left_join(beetus_yes, beetus_no, by = "region") %>%
+  mutate(prop_diabetes = diabetes_yes / (diabetes_yes + diabetes_no)) %>%
+  select(region, prop_diabetes)
+prop_prebeetus <- left_join(beetus_pre, beetus_none, by = "region") %>%
+  mutate(prop_prediabetes = prediabetes_yes / (prediabetes_yes + prediabetes_no)) %>%
+  select(region, prop_prediabetes)
+rm(beetus_yes, beetus_no, beetus_pre, beetus_none)
+
+# Calculating Proportion of State that has ever smoked more than 100 Cigarettes
+cig_yes <- group_by(BRFSS, region) %>%
+  filter(smoker == 1) %>%
+  summarize(smoker_yes = sum(weight))
+cig_no <- group_by(BRFSS, region) %>%
+  filter(smoker == 2) %>%
+  summarize(smoker_no = sum(weight))
+prop_cig <- left_join(cig_yes, cig_no, by = "region") %>%
+  mutate(prop_smoker = smoker_yes / (smoker_yes + smoker_no)) %>%
+  select(region, prop_smoker)
+rm(cig_yes, cig_no)
+
+# Calculating Proportion of State that got the flu shot in the last year
+shot_yes <- group_by(BRFSS, region) %>%
+  filter(flu == 1) %>%
+  summarize(flu_yes = sum(weight))
+shot_no <- group_by(BRFSS, region) %>%
+  filter(flu == 2) %>%
+  summarize(flu_no = sum(weight))
+prop_shot <- left_join(shot_yes, shot_no, by = "region") %>%
+  mutate(prop_flu = flu_yes / (flu_yes + flu_no)) %>%
+  select(region, prop_flu)
+rm(shot_yes, shot_no)
+
+# Calculating Proportion of State that has been vaccinated against pneumonia
+pneu_yes <- group_by(BRFSS, region) %>%
+  filter(vax == 1) %>%
+  summarize(vax_yes = sum(weight))
+pneu_no <- group_by(BRFSS, region) %>%
+  filter(vax == 2) %>%
+  summarize(vax_no = sum(weight))
+prop_pneu <- left_join(pneu_yes, pneu_no, by = "region") %>%
+  mutate(prop_vax = vax_yes / (vax_yes + vax_no)) %>%
+  select(region, prop_vax)
+rm(pneu_yes, pneu_no)
+
+left_join(prop_other, average_bmi, by = "region") %>%
+  left_join(prop_over, by = "region") %>%
+  left_join(prop_ob, by = "region") %>%
+  left_join(prop_beetus, by = "region") %>%
+  left_join(prop_prebeetus, by = "region") %>%
+  left_join(prop_cig, by = "region") %>%
+  left_join(prop_atmen, by = "region") %>%
+  left_join(prop_lungs, by = "region") %>%
+  left_join(prop_infarc, by = "region") %>%
+  left_join(prop_cva, by = "region") %>%
+  left_join(prop_kid, by = "region") %>%
+  left_join(prop_shot, by = "region") %>%
+  left_join(prop_pneu, by = "region") %>%
+  left_join(prop_cost_doc, by = "region") %>%
+  write_csv("./output/state_health.csv")
+rm(prop_other, average_bmi, prop_over, prop_ob,  prop_beetus, prop_prebeetus, prop_cig, prop_atmen, prop_lungs, prop_infarc, prop_cva, prop_kid, prop_shot, prop_pneu, prop_cost_doc)
 ```
 
+## BRFSS Data
+
+```{r tableStateHealthData, include = TRUE}
+knitr::kable(read_csv("./output/state_health.csv"))
+```
+
+\
+
+Words about the horrible data in the BRFSS, sorted by state and given by proportion.
+
+### Graphs and Math with BRFSS
+
+Here go all sorts of comparisons of state-level COVID data with the BRFSS data.
+
+\
+
 ---
+
+\
+
+## Race Data
+
+Brief intro into the racial data. Disclaimer about use of terminology ("not non-Hispanic White only" is not a feasible construct).
+
+### Choropleths
 
 ```{r choroplethRacePopulation, include = TRUE}
 # Map of State Non-White Pop Proportion
@@ -519,6 +685,8 @@ pop$show_labels = FALSE
 pop$render()
 ```
 
+Comment on racial distribution map.
+
 ```{r choroplethRaceCOVID, include = TRUE}
 # Map of State Non-White Distribution of COVID Deaths
 prop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
@@ -530,7 +698,11 @@ prop$show_labels = FALSE
 prop$render()
 ```
 
+Comment on COVID racial distribution map.
+
 ---
+
+### Maps
 
 ```{r mapRatioState, include = TRUE}
 # A fancier ggplot map
@@ -564,6 +736,8 @@ ggplot(states) +
   labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor not Non-Hispanic White Only State Population") +
 ggsave("./figures/ratio_state.png")
 ```
+
+Far more meaningful comments on this map showing the real data. Meat of Racial Section.
 
 ```{r mapRatioCounty, include = TRUE}
 # This is the same idea, but using the limited county-specific data
@@ -601,7 +775,15 @@ ggplot(mapData, aes(x = long,
 ggsave("./figures/ratio_county.png")
 ```
 
+A note on the uselessness of this map.
+
 ---
+
+### Graphs
+
+Introduce the graphs to come.
+
+**Here goes a picture of the Census Regions**
 
 ```{r plotCOVIDAgeRaceCensusRegion, include = TRUE}
 # Plots Ratio by Census Region
@@ -619,6 +801,8 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
   ylim(0, 4)
 ```
 
+Comment on the differences between regions. Note that the line at 1.0 is because there were no deaths, not because they were actually equal. Note general trends in age data.
+
 ```{r plotCOVIDStates, include = TRUE}
 # Plots Ratio by State, grouped by Census Region
 read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
@@ -633,6 +817,12 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
   theme_linedraw() +
   facet_grid(`Census Region` ~ .)
 ```
+
+Make this graph like fifty times taller. Then compare to previous, as it is simply a more granular version.
+
+---
+
+### Political Data
 
 ```{r tableCOVIDAgeState, include = TRUE}
 # As a table
@@ -664,7 +854,9 @@ knitr::kable(read_csv("./raw_data/States-Governors.csv") %>%
   select(-region))
 ```
 
----
+\
+
+Here is a table giving the age breakdowns and governor info for each state. Note anything of interest, like the number of female governors, republican governors, and female republican governors.
 
 ```{r plotCOVIDGovernorSex, include = TRUE, fig.cap = "**Figure**"}
 # By Governor Sex
@@ -685,6 +877,8 @@ read_csv("./raw_data/States-Governors.csv") %>%
   theme_linedraw()
 ```
 
+Note how bad this looks. It is because of Michigan and Kansas, and a little bit of Iowa. The other female-led states have far lower-than-average populations, and so do not affect this graph meaningfully. Male-led states are essentially a straight line through the average values.
+
 ```{r plotCOVIDGovernorParty, include = TRUE}
 # By Governor Party
 read_csv("./raw_data/States-Governors.csv") %>%
@@ -704,12 +898,26 @@ read_csv("./raw_data/States-Governors.csv") %>%
   theme_linedraw()
 ```
 
+Note how there is no real difference in trend or value based on party. Speculate wildly about why.
+
+\
+
 ---
 
-# TODO
+\
 
-Include Census Region Map and download
+## Conclusions
+
+Everything is fine. No bad things have or will happen.
+
+\
+
+---
+
+\
+
+## TODO
+
+Download Census Region Map
 Download GovInfo
-
-State x Region needs much much taller, width okay, legend needs cap editing
-Table needs slight padding, some cell outlines
+Tables needs slight padding, some cell outlines
