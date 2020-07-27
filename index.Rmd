@@ -2,8 +2,42 @@
 title: "COVID Health and Race Trends"
 author: "Mitch Lueken"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
-output: html_document
+output:
+  html_document:
+    df_print: paged
 ---
+
+```{css styling, include = FALSE}
+body {
+  background-color: #dce6f5
+}
+
+table {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+
+td {
+  border: 1px solid black;
+  padding: 4px;
+  text-align: left;
+}
+
+th {
+  background-color: #4CAF50;
+  border: 1px solid black;
+  color: white;
+  padding: 4px;
+  text-align: left;
+}
+
+tr {
+  hover {background-color: #f5f5f5;
+  nth-child(even) {
+    background-color: #f2f2f2;
+  }
+}
+```
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE, include = FALSE)
@@ -17,9 +51,15 @@ library(dplyr)
 library(ggplot2)
 library(readxl)
 library(haven)
+library(htmltools)
 
 # This function makes the ggplot maps play nice with the names of counties
 source("./R/fipsCoercer.R")
+
+# This function commits great crimes against strings and tibbles
+# It reads a tibble, brute-forces the tibble into an html file and saves it
+# The javascript sorting function behaves alphabetically, rather than numerically
+source("./R/makeSortableHTMLTable.R")
 ```
 
 ```{r download}
@@ -457,6 +497,8 @@ Here go words about what is to follow.
 
 \
 
+## BRFSS Data
+
 ```{r manipulateBRFSSData}
 BRFSS <- read_csv("./output/BRFSS.csv")
 
@@ -630,7 +672,16 @@ prop_pneu <- left_join(pneu_yes, pneu_no, by = "region") %>%
   select(region, prop_vax)
 rm(pneu_yes, pneu_no)
 
-left_join(prop_other, average_bmi, by = "region") %>%
+read_csv("./raw_data/sc-est2019-alldata6.csv") %>%
+  filter(ORIGIN == 0 & SEX == 0) %>%
+  transmute(region = tolower(NAME), pop = POPESTIMATE2019) %>%
+  group_by(region) %>%
+  summarize(total_pop = sum(pop)) %>%
+  left_join(read_csv("./output/cdc_state_covid_race_data.csv") %>% mutate(region = tolower(State)), by = "region") %>%
+  mutate(deaths_per_100k = 100000.0 * (White_Deaths + `Non-White_Deaths`) / (total_pop)) %>%
+  select(region, deaths_per_100k) %>%
+  left_join(prop_other, by = "region") %>%
+  left_join(average_bmi, by = "region") %>%
   left_join(prop_over, by = "region") %>%
   left_join(prop_ob, by = "region") %>%
   left_join(prop_beetus, by = "region") %>%
@@ -644,23 +695,238 @@ left_join(prop_other, average_bmi, by = "region") %>%
   left_join(prop_shot, by = "region") %>%
   left_join(prop_pneu, by = "region") %>%
   left_join(prop_cost_doc, by = "region") %>%
-  write_csv("./output/state_health.csv")
+  write_csv("./output/state_health.csv") %>%
+  filter(!is.na(deaths_per_100k)) %>%
+  write_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  transmute(State = paste(toupper(substring(strsplit(region, " ")[[1]], 1, 1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " "),
+            `Deaths per 100,000 Population` = round(deaths_per_100k, 1),
+            `Percent not Non-Hispanic White Only` = round(100.0 * prop_others, 2),
+            `Mean BMI` = round(avg_bmi, 2),
+            `Percent Overweight or Obese` = round(100.0 * prop_overweight, 2),
+            `Percent Obese` = round(100.0 * prop_obese, 2),
+            `Percent Diabetes or Prediabetes` = round(100.0 * prop_diabetes, 2),
+            `Percent Prediabetes` = round(100.0 * prop_prediabetes, 2),
+            `Percent Ever Smoked 100 Cigarettes` = round(100.0 * prop_smoker, 2),
+            `Percent Asthma` = round(100.0 * prop_asthma, 2),
+            `Percent COPD` = round(100.0 * prop_copd, 2),
+            `Percent Heart Attack` = round(100.0 * prop_infarction, 2),
+            `Percent Stroke` = round(100.0 * prop_stroke, 2),
+            `Percent Kidney Disease` = round(100.0 * prop_kidney, 2),
+            `Percent Flu Shot in Last Year` = round(100.0 * prop_flu, 2),
+            `Percent Pneumonia Vaccine` = round(100.0 * prop_vax, 2),
+            `Percent Can't Afford Doctor` = round(100.0 * prop_cost_doctor, 2)) %>%
+  mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
+  ungroup() %>%
+  select(-region) %>%
+  write_csv("./output/state_health_no_na_trimmed.csv")
+  
 rm(prop_other, average_bmi, prop_over, prop_ob,  prop_beetus, prop_prebeetus, prop_cig, prop_atmen, prop_lungs, prop_infarc, prop_cva, prop_kid, prop_shot, prop_pneu, prop_cost_doc)
 ```
 
-## BRFSS Data
-
 ```{r tableStateHealthData, include = TRUE}
-knitr::kable(read_csv("./output/state_health.csv"))
+# This saves a table out of the trimmed health data, then spits it out as raw text like its markdown, creating an html table
+makeSortableHTMLTable(read_csv("./output/state_health_no_na_trimmed.csv"), "state_health_no_na_trimmed_table")
+htmltools::includeHTML("./output/state_health_no_na_trimmed_table.html")
 ```
+\
+
+Introduce the horrifying BRFSS data.
 
 \
 
-Words about the horrible data in the BRFSS, sorted by state and given by proportion.
+---
 
-### Graphs and Math with BRFSS
+\
 
-Here go all sorts of comparisons of state-level COVID data with the BRFSS data.
+### Deaths and Race
+
+```{r graphStateHealthPropOthers, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Racial Makeup
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_others)
+
+ggplot(data, aes(x = data$prop_others, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+x
+
+---
+
+### Deaths and BMI
+
+```{r graphStateHealthAvgBMI, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Average BMI
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, avg_bmi)
+
+ggplot(data, aes(x = data$avg_bmi, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+```{r graphStateHealthPropOver, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Overweight Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_overweight)
+
+ggplot(data, aes(x = data$prop_overweight, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+```{r graphStateHealthPropObese, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Obesity Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_obese)
+
+ggplot(data, aes(x = data$prop_obese, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+x
+
+---
+
+### Deaths and Diabetes
+
+```{r graphStateHealthPropDiabetes, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Diabetes Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_diabetes)
+
+ggplot(data, aes(x = data$prop_diabetes, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+x
+
+```{r graphStateHealthPropPrediabetes, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Prediabetes Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_prediabetes)
+
+ggplot(data, aes(x = data$prop_prediabetes, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+x
+
+___
+
+### Deaths and Lungs
+
+```{r graphStateHealthPropSmoker, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Smoking
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_smoker)
+
+ggplot(data, aes(x = data$prop_smoker, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Smoking.
+
+```{r graphStateHealthPropAsthma, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Asthma Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_asthma)
+
+ggplot(data, aes(x = data$prop_asthma, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Asthma
+
+```{r graphStateHealthPropCOPD, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs COPD Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_copd)
+
+ggplot(data, aes(x = data$prop_copd, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+COPD
+
+---
+
+### Deaths and CVD
+
+```{r graphStateHealthPropInfarction, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Heart Attacks
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_infarction)
+
+ggplot(data, aes(x = data$prop_infarction, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Infarction
+
+```{r graphStateHealthPropStroke, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Strokes
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_stroke)
+
+ggplot(data, aes(x = data$prop_stroke, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Stroke
+
+---
+
+### Deaths and Kidney Disease
+
+```{r graphStateHealthPropKidney, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Chronic Kidney Disease
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_kidney)
+
+ggplot(data, aes(x = data$prop_kidney, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+CKD
+
+---
+
+### Deaths and Vaccinations
+
+```{r graphStateHealthPropFlu, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Flu Shots
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_flu)
+
+ggplot(data, aes(x = data$prop_flu, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+```{r graphStateHealthPropVax, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Vaccination
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_vax)
+
+ggplot(data, aes(x = data$prop_vax, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Flu and Pneumonia.
+
+---
+
+### Deaths and Healthcare Cost
+
+```{r graphStateHealthPropCostDoctor, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Unaffordable Healthcare
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region) %>%
+  select(deaths_per_100k, prop_cost_doctor)
+
+ggplot(data, aes(x = data$prop_cost_doctor, y = data$deaths_per_100k, color = region)) + geom_point(size = 2) + theme_linedraw()
+```
+
+Doc Cost.
 
 \
 
@@ -838,7 +1104,7 @@ knitr::kable(read_csv("./raw_data/States-Governors.csv") %>%
   pivot_wider(names_from = age, values_from = pop_avg) %>%
   mutate(`Governor Sex` = if_else(Gov_Male, "Male", "Female"),
          `Governor Party` = if_else(Gov_Rep, "Republican", "Democrat"),
-         State = paste(toupper(substring(strsplit(region, " ")[[1]], 1,1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " ")) %>%
+         State = paste(toupper(substring(strsplit(region, " ")[[1]], 1, 1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " ")) %>%
   mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
   transmute(State,
             `Governor Party`,
@@ -899,6 +1165,16 @@ read_csv("./raw_data/States-Governors.csv") %>%
 ```
 
 Note how there is no real difference in trend or value based on party. Speculate wildly about why.
+
+\
+
+---
+
+\
+
+## Misc
+
+Here goes all the random little things to look into (Whole Foods, religion, etc.).
 
 \
 
