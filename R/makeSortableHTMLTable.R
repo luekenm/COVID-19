@@ -6,7 +6,7 @@ makeSortableHTMLTable <- function(table, tableID) {
   filerow[i] = "<tr>"
   i = i + 1
   for(column_name in attr(table, "names")) {
-    filerow[i] = paste("<th onclick=\"w3.sortHTML('#", tableID, "','.item', 'td:nth-child(", i, ")')\">", column_name, "</th>", sep = "")
+    filerow[i] = paste("<th onclick=\"w3.sortHTML('#", tableID, "','.item', 'td:nth-child(", i - 2, ")')\">", column_name, "</th>", sep = "")
     i = i + 1
   }
   filerow[i] = "</tr>"

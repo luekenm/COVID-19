@@ -1,0 +1,475 @@
+---
+title: "Health"
+output: html_document
+---
+
+## BRFSS Data
+
+```{r manipulateBRFSSData}
+BRFSS <- read_csv("./output/BRFSS.csv") %>%
+# Splitting the BRFSS data by age bracket, with some abuse of good statistical practice, but only a little
+  mutate(age = if_else(age == 2 | age == 3, "25-34 years",
+                       if_else(age == 4 | age == 5, "35-44 years",
+                               if_else(age == 6 | age == 7, "45-54 years",
+                                       if_else(age == 8 | age == 9, "55-64 years",
+                                               if_else(age == 10 | age == 11, "65-74 years",
+                                                       if_else(age == 12 | age == 13, "75-84 years",
+                                                               "NA")))))),
+# Simplifying race variable
+         isWhite = if_else(race == 1, TRUE,
+                        if_else(race == 2, FALSE,
+                                NA))) %>%
+  filter(!is.na(isWhite)) %>%
+  filter(age != "NA")
+
+# Calculating Proportion of State that is not Non-Hispanic White
+white <- group_by(BRFSS, region, age) %>%
+  filter(race == 1) %>%
+  summarize(whites = sum(weight))
+other <- group_by(BRFSS, region, age) %>%
+  filter(race == 2) %>%
+  summarize(others = sum(weight))
+prop_other <- left_join(white, other, by = c("region", "age")) %>%
+  mutate(prop_others = others / (whites + others)) %>%
+  select(region, age, prop_others)
+rm(white, other)
+
+# Calculating Average BMI
+average_bmi <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(!is.na(bmi)) %>%
+  summarize(avg_bmi = sum(weight * bmi) / (100 * sum(weight)))
+
+# Calculating Proportion of overweight (including obese) population (BMI >= 25.00)
+weight_over <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(!is.na(bmi) & bmi >= 2500) %>%
+  summarize(overweight = sum(weight))
+weight_not_over <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(!is.na(bmi) & bmi < 2500) %>%
+  summarize(not_overweight = sum(weight))
+prop_over <- left_join(weight_over, weight_not_over, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_overweight = overweight / (overweight + not_overweight)) %>%
+  select(region, age, isWhite, prop_overweight)
+rm(weight_over, weight_not_over)
+
+# Calculating Proportion of obese population (BMI >= 30.00)
+weight_ob <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(!is.na(bmi) & bmi >= 3000) %>%
+  summarize(obese = sum(weight))
+weight_not_ob <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(!is.na(bmi) & bmi < 3000) %>%
+  summarize(not_obese = sum(weight))
+prop_ob <- left_join(weight_ob, weight_not_ob, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_obese = obese / (obese + not_obese)) %>%
+  select(region, age, isWhite, prop_obese)
+rm(weight_ob, weight_not_ob)
+
+# Calculating Proportion of State that has been unable to visit doctor because of cost
+cost_doc_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(cost_doctor == 1) %>%
+  summarize(cost_doctor_yes = sum(weight))
+cost_doc_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(cost_doctor == 2) %>%
+  summarize(cost_doctor_no = sum(weight))
+prop_cost_doc <- left_join(cost_doc_yes, cost_doc_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_cost_doctor = cost_doctor_yes / (cost_doctor_yes + cost_doctor_no)) %>%
+  select(region, age, isWhite, prop_cost_doctor)
+rm(cost_doc_yes, cost_doc_no)
+
+# Calculating Proportion of State that has had a heart attack
+infarc_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(infarction == 1) %>%
+  summarize(infarction_yes = sum(weight))
+infarc_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(infarction == 2) %>%
+  summarize(infarction_no = sum(weight))
+prop_infarc <- left_join(infarc_yes, infarc_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_infarction = infarction_yes / (infarction_yes + infarction_no)) %>%
+  select(region, age, isWhite, prop_infarction)
+rm(infarc_yes, infarc_no)
+
+# Calculating Proportion of State that has had a stroke
+cva_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(stroke == 1) %>%
+  summarize(stroke_yes = sum(weight))
+cva_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(stroke == 2) %>%
+  summarize(stroke_no = sum(weight))
+prop_cva <- left_join(cva_yes, cva_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_stroke = stroke_yes / (stroke_yes + stroke_no)) %>%
+  select(region, age, isWhite, prop_stroke)
+rm(cva_yes, cva_no)
+
+# Calculating Proportion of State that has had asthma
+atmen_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(asthma == 1) %>%
+  summarize(asthma_yes = sum(weight))
+atmen_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(asthma == 2) %>%
+  summarize(asthma_no = sum(weight))
+prop_atmen <- left_join(atmen_yes, atmen_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_asthma = asthma_yes / (asthma_yes + asthma_no)) %>%
+  select(region, age, isWhite, prop_asthma)
+rm(atmen_yes, atmen_no)
+
+# Calculating Proportion of State that has had COPD
+lungs_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(copd == 1) %>%
+  summarize(copd_yes = sum(weight))
+lungs_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(copd == 2) %>%
+  summarize(copd_no = sum(weight))
+prop_lungs <- left_join(lungs_yes, lungs_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_copd = copd_yes / (copd_yes + copd_no)) %>%
+  select(region, age, isWhite, prop_copd)
+rm(lungs_yes, lungs_no)
+
+# Calculating Proportion of State that has had Chronic Kidney Disease
+kid_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(kidney == 1) %>%
+  summarize(kidney_yes = sum(weight))
+kid_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(kidney == 2) %>%
+  summarize(kidney_no = sum(weight))
+prop_kid <- left_join(kid_yes, kid_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_kidney = kidney_yes / (kidney_yes + kidney_no)) %>%
+  select(region, age, isWhite, prop_kidney)
+rm(kid_yes, kid_no)
+
+# Calculating Proportion of State that has Diabetes (Excluding Gestational Diabetes) 1 4 23
+beetus_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(brimley == 1) %>%
+  summarize(diabetes_yes = sum(weight))
+beetus_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(brimley == 2 | brimley == 3 | brimley == 4) %>%
+  summarize(diabetes_no = sum(weight))
+beetus_pre <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(brimley == 1 | brimley == 4) %>%
+  summarize(prediabetes_yes = sum(weight))
+beetus_none <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(brimley == 2 | brimley == 3) %>%
+  summarize(prediabetes_no = sum(weight))
+prop_beetus <- left_join(beetus_yes, beetus_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_diabetes = diabetes_yes / (diabetes_yes + diabetes_no)) %>%
+  select(region, age, isWhite, prop_diabetes)
+prop_prebeetus <- left_join(beetus_pre, beetus_none, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_prediabetes = prediabetes_yes / (prediabetes_yes + prediabetes_no)) %>%
+  select(region, age, isWhite, prop_prediabetes)
+rm(beetus_yes, beetus_no, beetus_pre, beetus_none)
+
+# Calculating Proportion of State that has ever smoked more than 100 Cigarettes
+cig_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(smoker == 1) %>%
+  summarize(smoker_yes = sum(weight))
+cig_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(smoker == 2) %>%
+  summarize(smoker_no = sum(weight))
+prop_cig <- left_join(cig_yes, cig_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_smoker = smoker_yes / (smoker_yes + smoker_no)) %>%
+  select(region, age, isWhite, prop_smoker)
+rm(cig_yes, cig_no)
+
+# Calculating Proportion of State that smokes cigarettes most days
+smoke_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(smoke == 1 | smoke == 2) %>%
+  summarize(smokes_yes = sum(weight))
+smoke_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(smoke == 3) %>%
+  summarize(smokes_no = sum(weight))
+prop_smoke <- left_join(smoke_yes, smoke_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_smokes = smokes_yes / (smokes_yes + smokes_no)) %>%
+  select(region, age, isWhite, prop_smokes)
+rm(smoke_yes, smoke_no)
+
+# Calculating Proportion of State that got the flu shot in the last year
+shot_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(flu == 1) %>%
+  summarize(flu_yes = sum(weight))
+shot_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(flu == 2) %>%
+  summarize(flu_no = sum(weight))
+prop_shot <- left_join(shot_yes, shot_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_flu = flu_yes / (flu_yes + flu_no)) %>%
+  select(region, age, isWhite, prop_flu)
+rm(shot_yes, shot_no)
+
+# Calculating Proportion of State that has been vaccinated against pneumonia
+pneu_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(vax == 1) %>%
+  summarize(vax_yes = sum(weight))
+pneu_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(vax == 2) %>%
+  summarize(vax_no = sum(weight))
+prop_pneu <- left_join(pneu_yes, pneu_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_vax = vax_yes / (vax_yes + vax_no)) %>%
+  select(region, age, isWhite, prop_vax)
+rm(pneu_yes, pneu_no)
+
+read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
+  group_by(region, age) %>%
+  filter(!(age %in% c("Under 1 year", "1-4 years", "5-14 years", "15-24 years"))) %>%
+  transmute(white_deaths_per_100k =100000.0 * (White) / (Pop_White),
+            nonwhite_deaths_per_100k =100000.0 * (`Non-White`) / (`Pop_Non-White`)) %>%
+  left_join(prop_other, by = c("region", "age")) %>%
+  left_join(average_bmi, by = c("region", "age")) %>%
+  mutate(deaths_per_100k = if_else(isWhite, white_deaths_per_100k, nonwhite_deaths_per_100k)) %>%
+  left_join(prop_over, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_ob, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_beetus, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_prebeetus, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_cig, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_smoke, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_atmen, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_lungs, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_infarc, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_cva, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_kid, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_shot, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_pneu, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_cost_doc, by = c("region", "age", "isWhite")) %>%
+  write_csv("./output/state_health.csv") %>%
+  filter(!is.na(deaths_per_100k)) %>%
+  write_csv("./output/state_health_no_na.csv") %>%
+  transmute(State = paste(toupper(substring(strsplit(region, " ")[[1]], 1, 1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " "),
+            `Age Bracket` = age,
+            `Racial Group` = if_else(isWhite, "White", "Not Non-Hispanic White Only"),
+            `Deaths per 100,000 Population` = round(deaths_per_100k, 1),
+            `Percent not Non-Hispanic White Only` = round(100.0 * prop_others, 2),
+            `Mean BMI` = round(avg_bmi, 2),
+            `Percent Overweight or Obese` = round(100.0 * prop_overweight, 2),
+            `Percent Obese` = round(100.0 * prop_obese, 2),
+            `Percent Diabetes or Prediabetes` = round(100.0 * prop_diabetes, 2),
+            `Percent Prediabetes` = round(100.0 * prop_prediabetes, 2),
+            `Percent Ever Smoked 100 Cigarettes` = round(100.0 * prop_smoker, 2),
+            `Percent Smoke Most Days` = round(100.0 * prop_smokes, 2),
+            `Percent Asthma` = round(100.0 * prop_asthma, 2),
+            `Percent COPD` = round(100.0 * prop_copd, 2),
+            `Percent Heart Attack` = round(100.0 * prop_infarction, 2),
+            `Percent Stroke` = round(100.0 * prop_stroke, 2),
+            `Percent Kidney Disease` = round(100.0 * prop_kidney, 2),
+            `Percent Flu Shot in Last Year` = round(100.0 * prop_flu, 2),
+            `Percent Pneumonia Vaccine` = round(100.0 * prop_vax, 2),
+            `Percent Can't Afford Doctor` = round(100.0 * prop_cost_doctor, 2)) %>%
+  mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
+  ungroup() %>%
+  select(-region, age) %>%
+  write_csv("./output/state_health_no_na_trimmed.csv")
+  
+rm(prop_other, average_bmi, prop_over, prop_ob,  prop_beetus, prop_prebeetus, prop_cig, prop_atmen, prop_lungs, prop_infarc, prop_cva, prop_kid, prop_shot, prop_pneu, prop_cost_doc)
+```
+
+```{r tableStateHealthData, include = TRUE}
+# This saves a table out of the trimmed health data, then spits it out as raw text like its markdown, creating an html table
+makeSortableHTMLTable(read_csv("./output/state_health_no_na_trimmed.csv"), "state_health_no_na_trimmed_table")
+# htmltools::includeHTML("./output/state_health_no_na_trimmed_table.html")
+```
+\
+
+Introduce the horrifying BRFSS data.
+
+\
+
+---
+
+\
+
+### Deaths and Race
+
+```{r graphStateHealthPropOthers, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Racial Makeup
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_others)
+
+ggplot(data, aes(x = data$prop_others, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+x
+
+---
+
+### Deaths and BMI
+
+```{r graphStateHealthAvgBMI, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Average BMI
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, avg_bmi)
+
+ggplot(data, aes(x = data$avg_bmi, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+```{r graphStateHealthPropOver, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Overweight Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_overweight)
+
+ggplot(data, aes(x = data$prop_overweight, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+```{r graphStateHealthPropObese, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Obesity Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_obese)
+
+ggplot(data, aes(x = data$prop_obese, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+x
+
+---
+
+### Deaths and Diabetes
+
+```{r graphStateHealthPropDiabetes, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Diabetes Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_diabetes)
+
+ggplot(data, aes(x = data$prop_diabetes, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+x
+
+```{r graphStateHealthPropPrediabetes, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Prediabetes Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_prediabetes)
+
+ggplot(data, aes(x = data$prop_prediabetes, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+x
+
+___
+
+### Deaths and Lungs
+
+```{r graphStateHealthPropSmoker, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Smoking
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_smoker)
+
+ggplot(data, aes(x = data$prop_smoker, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+```{r graphStateHealthPropSmokes, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Smoking
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_smokes)
+
+ggplot(data, aes(x = data$prop_smokes, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Smoking.
+
+```{r graphStateHealthPropAsthma, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Asthma Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_asthma)
+
+ggplot(data, aes(x = data$prop_asthma, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Asthma
+
+```{r graphStateHealthPropCOPD, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs COPD Prevalence
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_copd)
+
+ggplot(data, aes(x = data$prop_copd, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+COPD
+
+---
+
+### Deaths and CVD
+
+```{r graphStateHealthPropInfarction, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Heart Attacks
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_infarction)
+
+ggplot(data, aes(x = data$prop_infarction, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Infarction
+
+```{r graphStateHealthPropStroke, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Strokes
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_stroke)
+
+ggplot(data, aes(x = data$prop_stroke, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Stroke
+
+---
+
+### Deaths and Kidney Disease
+
+```{r graphStateHealthPropKidney, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Chronic Kidney Disease
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_kidney)
+
+ggplot(data, aes(x = data$prop_kidney, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+CKD
+
+---
+
+### Deaths and Vaccinations
+
+```{r graphStateHealthPropFlu, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Flu Shots
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_flu)
+
+ggplot(data, aes(x = data$prop_flu, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+```{r graphStateHealthPropVax, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Vaccination
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_vax)
+
+ggplot(data, aes(x = data$prop_vax, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Flu and Pneumonia.
+
+---
+
+### Deaths and Healthcare Cost
+
+```{r graphStateHealthPropCostDoctor, include = TRUE}
+# A graph of per Capita COVID-19 Deaths vs Unaffordable Healthcare
+data <- read_csv("./output/state_health_no_na.csv") %>%
+  group_by(region, age) %>%
+  select(deaths_per_100k, isWhite, prop_cost_doctor)
+
+ggplot(data, aes(x = data$prop_cost_doctor, y = data$deaths_per_100k, color = age, shape = isWhite)) + geom_jitter(size = 4, alpha = 0.75) + theme_linedraw()
+```
+
+Doc Cost.
+
+\
+
+---
