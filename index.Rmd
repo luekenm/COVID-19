@@ -51,6 +51,7 @@ library(ggplot2)
 library(readxl)
 library(haven)
 library(htmltools)
+library(pdftools)
 
 # This function commits great crimes against strings and tibbles
 # It reads a tibble, brute-forces the tibble into an html file and saves it
@@ -60,6 +61,8 @@ source("./R/makeSortableHTMLTable.R")
 # This function does the same, but without the sorting function
 # It also removes NAs and replaces them with empty strings
 source("./R/makeHTMLTable.R")
+
+data("state.regions")
 ```
 
 ```{r download}
@@ -132,7 +135,7 @@ if(!file.exists("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv")
 
 # Census Regions
 if(!file.exists("./raw_data/us_regdiv.pdf")) {
-  wget(url = "https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf", destfile = "./raw_data/us_regdiv.pdf")
+  wget(url = "https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf", destfile = "./raw_data/us_regdiv.pdf", )
 }
 
 ```
@@ -510,19 +513,15 @@ This report is a data analysis investigation into racial disparity in deaths fro
 
 NOTE: Throughout the report the population is separated into two groups, "non-Hispanic White only", and "not Non-Hispanic White only", based on Census categories. For lack of a more feasible racially-sensitive construct, these will be referred to as "White" and "non-White", respectively. Any analyses including "Hispanic Whites" in "White", or not limiting to "White only", or using any other racial groupings, could reach different, equally-valid conclusions.
 
-\
-
 ---
 
-## Race Data
+## Racial Data
 
 The data on population and racial breakdowns by states come from the Census. The [Annual State Resident Population Estimates for 6 Race Groups (5 Race Alone Groups and Two or More Races) by Age, Sex, and Hispanic Origin](https://www2.census.gov/programs-surveys/popest/technical-documentation/file-layouts/2010-2019/sc-est2019-alldata6.pdf) document from 2020 gives the estimates as of 2020-07-01, the most recent publicly available figures.
 
 The data on COVID deaths by race, state, and age, come from the [Provisional Death Counts for Coronavirus Disease (COVID-19): Weekly State-Specific Data Updates](https://data.cdc.gov/NCHS/Provisional-Death-Counts-for-Coronavirus-Disease-C/pj7m-y5uh), which is produced by the National Center for Health Statistics division of the CDC, using data from the National Vital Statistics System.
 
 Data is absent for Vermont, Montana, Wyoming, Alaska, and Hawaii.
-
-\
 
 ### Maps
 
@@ -669,15 +668,13 @@ ggplot(filter(mapData, region == "new york"), aes(x = long,
 
 Among those worst states, the RDI seems to be worse in bigger cities like New York City, Detroit, Flint, and Grand Rapids (see figures 4 and 5).
 
-\
-
----
-
 ### Age Differences
 
 The RDI varies somewhat by age bracket. The RDI for each age bracket was calculated for each Census Region.
 
-`r png::writePNG(pdf_render_page("./raw_data/us_regdiv.pdf", page = 1, dpi = 300),"./figures/census_regions.png")`
+```{r censusRegions}
+png::writePNG(pdf_render_page("./raw_data/us_regdiv.pdf", page = 1, dpi = 300),"./figures/census_regions.png")
+```
 
 ![Census Regions](./figures/census_regions.png)
 **Figure 6:** Census Regions and Divisions of the United States
@@ -735,10 +732,8 @@ Figure 8 shows the individual contributions of each state, with empty values (no
 
 ### Political Data
 
-```{r tableCOVIDAgeState, include = TRUE, fig.cap = "**Table 1:** Age-Based RDI and Political Data by State"}
+```{r tableCOVIDAgeState, include = TRUE}
 # As a table
-data("state.regions")
-
 read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
   select(region, Gov_Male, Gov_Rep) %>%
@@ -786,6 +781,8 @@ read_csv("./output/state_data.csv") %>%
 
 htmltools::includeHTML("./output/state_data_table.html") # Pastes html table into Rmd
 ```
+
+**Table 1:** Age-Based RDI and Political Data by State
 
 \
 
@@ -875,11 +872,10 @@ Tables 2 and 3 show that neither the sex nor the party of a state's governor mak
 
 ## Health Data
 
-Using data from the [Behavioral Risk Factor Surveillance System](https://www.cdc.gov/brfss/index.html), data about health factors and living condition of the non-White population were analyzed. Figure 11 shows the significant negative correlation between pneumonia vaccination and per capita COVID deaths among the elderly non-White population. The correlations were similarly negatively-correlated for the elderly White population, but orders of magnitude weaker (data not shown).
+Using data from the [Behavioral Risk Factor Surveillance System](https://www.cdc.gov/brfss/index.html) (BRFSS), health factors and living conditions affecting the non-White population were analyzed. Figure 11 shows the significant negative correlation between pneumonia vaccination and per capita COVID deaths among the elderly non-White population. The correlations were similarly negatively-correlated for the elderly White population, but orders of magnitude weaker (data not shown). The noticeably lower rate of pneumonia vaccination among the non-White population (table 4) is then a potential source of the differential rate of death from COVID, especially among the elderly.
 
 ```{r tidyBRFSSData}
 # WARNING: This is a LOT of data, and a LOT of writing. You have been warned, Hard Disk users.
-data("state.regions")
 select(state.regions, region, `_STATE` = fips.numeric) %>%
   left_join(read_xpt("./raw_data/LLCP2018.XPT"), by = "_STATE") %>%
   select(weight = `_LLCPWT`, #Statistical Raking Weight
@@ -893,6 +889,19 @@ select(state.regions, region, `_STATE` = fips.numeric) %>%
          age = `_AGEG5YR` 
   	) %>%
   write_csv("./output/BRFSS.csv")
+```
+
+```{r ratePneumoniaVax, include = TRUE, fig.cap = "**Table 4:** Pneumonia Vaccination by Racial Group"}
+read_csv("./output/BRFSS.csv") %>%
+  mutate(isWhite = if_else(race == 1, TRUE,if_else(race == 2, FALSE, NA))) %>%
+  group_by(isWhite) %>%
+  filter(!is.na(isWhite) & !is.na(vax)) %>%
+  select(isWhite, vax, weight) %>%
+  summarize(yes = sum(if_else(vax == 1, weight, 0)),
+            no = sum(if_else(vax == 2, weight, 0)),
+            prop = yes / (yes + no)) %>%
+  transmute(`Racial Group` = if_else(isWhite, "White", "Non-White"),
+            `Percent Vaccinated Against Pneumonia` = paste(signif(100 * prop, 4), "%"))
 ```
 
 ```{r manipulateBRFSSData}
@@ -1002,7 +1011,7 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
 rm(prop_met, prop_urb, prop_rur, prop_pneu, prop_as, BRFSS)
 ```
 
-```{r graphVax, include = TRUE, fig.cap = "**Figure: 11:** "}
+```{r graphVax, include = TRUE, fig.cap = "**Figure: 11:** The correlation between pneumonia vaccination and per capita COVID deaths among the elderly non-White population"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1033,9 +1042,9 @@ ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
   geom_label(label = data$lab, aes(85, data$y))
 ```
 
-Words.
+While statewide rates of pneumonia vaccination was significantly correlated with per capita COVID deaths, many other health variables (see figure 12; many others not shown) did not reach statistical significance. While it is possible that this reflects there actual lack of correlation, the more likely explanation is the lack in granularity in examining state-level data. Varying levels of [evidence](https://www.cdc.gov/coronavirus/2019-ncov/need-extra-precautions/evidence-table.html) exist for different conditions. Issues in reporting from different state- and county-level departments of health and coroners, and lack of availability of comorbidity data contribute to the difficulty in determining these correlations. Additionally, [lack of COVID testing and other factors](https://www.cdc.gov/nchs/nvss/vsrr/covid19/excess_deaths.htm) can lead to deaths not being correctly included in COVID counts.
 
-```{r graphAsthma, include = TRUE, fig.cap = "**Figure:**"}
+```{r graphAsthma, include = TRUE, fig.cap = "**Figure 12:** The insignificant correlation between asthma and per capita COVID deaths among the elderly non-White population"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1065,20 +1074,20 @@ ggplot(data, aes(100 * prop_asthma, deaths_per_100k)) +
        y = "Deaths per 100k Population") +
   geom_label(label = data$lab, aes(35, data$y))
 ```
+\
 
-Words.
-
-# TODO
-
-Health Commentary
+---
 
 ### Metro
 
-Words about metro and suburban.
+Using data taken from the BRFSS, the effect of various measures of population density were analyzed. Using the United States Office of Management and Budget definition of Metropolitan Statistical Areas (MSAs, figure 12), the correlations between living in metropolitan areas, including (figure 13) or excluding (figure 14) the suburbs, and per capita COVID deaths among the non-White population were determined.
 
 ![Metropolitan Statistical Areas](./figures/msa.gif)
+**Figure 12:** Metropolitan Statistical Areas
 
-```{r graphMetro, include = TRUE, fig.cap = "**Figure:**"}
+\
+
+```{r graphMetro, include = TRUE, fig.cap = "**Figure 13:** The correlations between living in MSAs and per capita COVID deaths among the non-White population"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1165,7 +1174,7 @@ ggplot(data, aes(100 * prop_metro, deaths_per_100k)) +
   ggsave("./figures/state_metro.png", height = 14, width = 7)
 ```
 
-```{r graphUrban, include = TRUE, fig.cap = "**Figure:**"}
+```{r graphUrban, include = TRUE, fig.cap = "**Figure 14:** The correlations between living in MSAs (excluding suburbs) and per capita COVID deaths among the non-White population"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1252,7 +1261,9 @@ ggplot(data, aes(100 * prop_urban, deaths_per_100k)) +
   ggsave("./figures/state_urban.png", height = 14, width = 7)
 ```
 
-```{r graphRural, include = TRUE, fig.cap = "**Figure:**"}
+asdfasdf
+
+```{r graphRural, include = TRUE, fig.cap = "**Figure 15:** The correlations between living in rural counties and per capita COVID deaths among the non-White population"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1339,7 +1350,7 @@ ggplot(data, aes(100 * prop_rural, deaths_per_100k)) +
   ggsave("./figures/state_rural.png", height = 14, width = 7)
 ```
 
-```{r graphPopDensity, include = TRUE, fig.cap = "**Figure:**"}
+```{r graphPopDensity, include = TRUE, fig.cap = "**Figure 16:** The correlations between population and per capita COVID deaths among the non-White population"}
 statePop <- read_csv("./raw_data/sc-est2019-alldata6.csv") %>%
     filter(SEX == 0 & ORIGIN == 0) %>%
     group_by(NAME) %>%
@@ -1436,15 +1447,23 @@ ggplot(data, aes(density, deaths_per_100k)) +
 rm(younger, young, youngish, oldish, old, older, data)
 ```
 
-As shown in figures x-x, several measures of density are significantly correlated with the severity of COVID pandemic. Statewide measures of the percentage of the population living in metropolitan areas, including (figure x) or excluding (figure x) the suburbs, showed strong positive relationships with per capita deaths from COVID among non-White populations of all ages. The expected opposite trend holds for the statewide percentage of the population living in rural areas (figure x). More directly, population density (figure x) showed the strongest correlation with per capita COVID deaths across all age groups, races, and variables investigated (data not shown). These data are in line with the expectation that human-to-human diseases kill most readily in areas where humans are closer together.
-
----
+As shown in figures 13-16, all measures of density were significantly correlated with the severity of COVID pandemic. Statewide measures of the percentage of the population living in metropolitan areas showed strong positive relationships with per capita deaths from COVID among non-White populations of all ages. The expected opposite trend held for the statewide percentage of the population living in rural areas (figure 15). More directly, population density (figure 16) showed the strongest correlation with per capita COVID deaths across all age groups, races, and variables investigated (data not shown). These data are in line with the expectation that human-to-human diseases kill most readily in areas where humans are closer together.
 
 \
 
+---
+
+## Conclusions
+
+Everything is fine. No bad things have or will happen.
+
+\
+
+---
+
 ## Misc
 
-Here goes all the random little things to look into (Whole Foods, religion, etc.).
+The following grab-bag of analyses are submitted for the reader's viewing pleasure, in honor of the dangers of careless data analysis and [spurious correlations](https://tylervigen.com/view_correlation?id=359).
 
 \
 
@@ -1460,10 +1479,11 @@ read_excel("./raw_data/states_votes.xlsx", sheet = "Table 2. Electoral &  Pop Vo
   write_csv("./output/States_votes.csv")
 ```
 
-Words.
+Words about elections.
+
+\
 
 ```{r religionData, echo = FALSE, message = FALSE}
-data("state.regions")
 tibbie <- read_sav("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav") %>%
   select(c(state, WEIGHT, qe1, qg1)) %>%
   rename(State = state, Religion = qe1, God = qg1, Weight = WEIGHT) %>%
@@ -1508,7 +1528,9 @@ state.regions %>%
 rm(proportionNoGod, proportionNone)
 ```
 
-Words.
+Words about religion.
+
+\
 
 ```{r confederateData, echo = FALSE, message = FALSE, warning = FALSE}
 monuments <- read_csv("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv") %>%
@@ -1535,7 +1557,9 @@ full_join(monuments, statePop, by =  "region") %>%
 rm(georgia, monuments)
 ```
 
-Words.
+Words about monuments.
+
+\
 
 ```{r wholeFoodsData, echo = FALSE, message = FALSE}
 read_csv("./raw_data/states_whole_foods.csv") %>%
@@ -1545,24 +1569,4 @@ read_csv("./raw_data/states_whole_foods.csv") %>%
 	write_csv("./output/states_whole_foods.csv")
 ```
 
-Words.
-
----
-
-\
-
-## Conclusions
-
-Everything is fine. No bad things have or will happen.
-
-\
-
----
-
-\
-
-## TODO
-
-Census Region Map
-ANOVA
-Health Data
+Words about Whole Foods.
