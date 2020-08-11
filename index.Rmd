@@ -71,6 +71,11 @@ library(readxl)
 library(haven)
 library(htmltools)
 library(pdftools)
+library(maps)
+library(mapproj)
+
+dir.create("./output")
+dir.create("./figures")
 
 # This function commits great crimes against strings and tibbles
 # It reads a tibble, brute-forces the tibble into an html file and saves it
