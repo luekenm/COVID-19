@@ -45,12 +45,12 @@ It could be hypothesized that [independent variable] is [sign] correlated with P
     <td>Male Governorship</td>
   </tr>
   <tr>
-    <td>4c</td>
+    <td>4</td>
     <td>+</td>
     <td>Republican Governorship</td>
   </tr>
   <tr>
-    <td>5c</td>
+    <td>5</td>
     <td>-</td>
     <td>Being White</td>
   </tr>
