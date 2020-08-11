@@ -567,7 +567,7 @@ ggplot(states) +
   scale_fill_gradient(name = "Percent\nnon-White",
                       low = "#000000",
                       high = "#18FF16",
-                      na.value = "black") +
+                      na.value = "#555555") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
@@ -607,7 +607,7 @@ ggplot(states) +
   scale_fill_gradient(name = "Percent\nDeaths",
                       low = "#000000",
                       high = "#1816FF",
-                      na.value = "black") +
+                      na.value = "#555555") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
@@ -1113,20 +1113,20 @@ data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
 
-old <- paste("Slope: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
                                     } else {
                                       signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
                                     },
-                           "\nr^2: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
-older <- paste("Slope: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
                                     } else {
                                       signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
                                     },
-                           "\nr^2: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
 
 data <- mutate(data, lab = if_else(age == "65-74 years", old, older), y = if_else(age == "65-74 years", 300, 1100))
 
@@ -1155,27 +1155,28 @@ ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
 
 ![**Figure 11:** The correlation between pneumonia vaccination and per capita COVID deaths among the elderly non-White population](./figures/graph_vaccination.png)
 
-While statewide rates of pneumonia vaccination was significantly correlated with per capita COVID deaths, many other health variables (see figure 12; many others not shown) did not reach statistical significance. While it is possible that this reflects there actual lack of correlation, the more likely explanation is the lack in granularity in examining state-level data. Varying levels of [evidence](https://www.cdc.gov/coronavirus/2019-ncov/need-extra-precautions/evidence-table.html) exist for different conditions. Issues in reporting from different state- and county-level departments of health and coroners, and lack of availability of comorbidity data contribute to the difficulty in determining these correlations. Additionally, [lack of COVID testing and other factors](https://www.cdc.gov/nchs/nvss/vsrr/covid19/excess_deaths.htm) can lead to deaths not being correctly included in COVID counts.
+While statewide rates of pneumonia vaccination was significantly correlated with per capita COVID deaths, other health variables (see figure 12; many, many others not shown) did not reach statistical significance. While it is possible that this reflects there actual lack of correlation, the more likely explanation is the lack in granularity when examining state-level data. Varying levels of [evidence](https://www.cdc.gov/coronavirus/2019-ncov/need-extra-precautions/evidence-table.html) exist for different conditions. Issues in reporting from different state- and county-level departments of health and coroners, and lack of availability of comorbidity data contribute to the difficulty in determining these correlations. Additionally, [lack of COVID testing and other factors](https://www.cdc.gov/nchs/nvss/vsrr/covid19/excess_deaths.htm) can lead to deaths not being correctly included in COVID counts.
 
 ```{r graphAsthma}
 data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
 
-old <- paste("Slope: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
                                     } else {
                                       signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
                                     },
-                           "\nr^2: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
-older <- paste("Slope: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "75-84 years")))[[4]][2, 1]/ 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
                                     } else {
                                       signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
                                     },
-                           "\nr^2: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_asthma, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
 
 data <- mutate(data, lab = if_else(age == "65-74 years", old, older), y = if_else(age == "65-74 years", 450, 1100))
 
@@ -1588,12 +1589,31 @@ rm(younger, young, youngish, oldish, old, older, data)
 
 As shown in figures 14-17, all measures of density were significantly correlated with the severity of COVID pandemic. Statewide measures of the percentage of the population living in metropolitan areas showed strong positive relationships with per capita deaths from COVID among non-White populations of all ages. The expected opposite trend held for the statewide percentage of the population living in rural areas (figure 16). More directly, population density (figure 17) showed the strongest correlation with per capita COVID deaths across all age groups, races, and variables investigated (data not shown). These data are in line with the expectation that human-to-human diseases kill most readily in areas where humans are closer together.
 
+**Table 5:** Metropolitan/Rural Residence by Racial Group
+
+```{r rateMSA, include = TRUE}
+read_csv("./output/BRFSS.csv") %>%
+  mutate(isWhite = if_else(race == 1, TRUE,if_else(race == 2, FALSE, NA))) %>%
+  group_by(isWhite) %>%
+  filter(!is.na(isWhite) & !is.na(metro) & !is.na(rural)) %>%
+  select(isWhite, metro, rural, weight) %>%
+  summarize(yesm = sum(if_else(metro == 1, weight, 0)),
+            nom = sum(if_else(metro == 2, weight, 0)),
+            propm = yesm / (yesm + nom),
+            yesr = sum(if_else(rural == 1, weight, 0)),
+            nor = sum(if_else(rural == 2, weight, 0)),
+            propr = nor / (yesr + nor)) %>%
+  transmute(`Racial Group` = if_else(isWhite, "White", "Non-White"),
+            `Percent Living in MSAs` = paste(signif(100 * propm, 4), "%"),
+            `Percent Living in Rural Counties` = paste(signif(100 * propr, 3), "%")) %>%
+  kable()
+```
 
 ---
 
 # Conclusions
 
-Everything is fine. No bad things have or will happen.
+The analyses revealed widespread, significant racial disparity in COVID deaths. Among the non-White population, the increased probability of living in more population-dense conditions (table 5) is likely to contribute seriously to difference in deaths. While some underlying health factors were found to contribute as well, without better reporting of death and comorbidity data, the evidence for the contributions of other health and demographic factors is too sparse for additional meaningful conclusions to be drawn yet. In short, close proximity to other humans is likely to be the strongest predictor of mortality from COVID, and a major driver of racial disparity in pandemic deaths.
 
 ---
 
@@ -1638,115 +1658,3 @@ Special thanks to the following sources of data:
 ## [Southern Poverty Law Center](https://www.splcenter.org/)
 
 ### [Whose Heritage?](https://www.splcenter.org/20190201/whose-heritage-public-symbols-confederacy)
-
----
-
-# Supplemental Data
-
-The following grab-bag of analyses are submitted for the reader's viewing pleasure, in honor of the dangers of careless data analysis and [spurious correlations](https://tylervigen.com/view_correlation?id=359).
-
-\
-
-```{r electionData, echo = FALSE, message = FALSE}
-read_excel("./raw_data/states_votes.xlsx", sheet = "Table 2. Electoral &  Pop Vote") %>%
-  select(1, 4, 5) %>%
-  rename(State = 1, Trump = 2, Clinton = 3) %>%
-  slice(4:54) %>%
-  mutate(Trump = as.numeric(Trump), Clinton = as.numeric(Clinton)) %>%
-  mutate(Margin = (Trump - Clinton) / (Trump + Clinton)) %>%
-  full_join(read_csv("./raw_data/states_governors.csv"), by = "State") %>%
-  select(State, Margin) %>%
-  write_csv("./output/States_votes.csv")
-```
-
-Words about elections.
-
-\
-
-```{r religionData, echo = FALSE, message = FALSE}
-tibbie <- read_sav("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav") %>%
-  select(c(state, WEIGHT, qe1, qg1)) %>%
-  rename(State = state, Religion = qe1, God = qg1, Weight = WEIGHT) %>%
-  mutate(Religion = if_else(Religion == 9 | Religion == 10 | Religion == 12, 0,
-            if_else(Religion > 0 & Religion < 100, 1,
-                  2))) %>%
-  filter(!(Religion == 2)) %>%
-  filter(God == 1 | God == 2) %>%
-  mutate(God = if_else(God == 1, 1, 0)) %>%
-  group_by(State)
-
-totalWeight <- tibbie %>%
-  summarize(Total_Weight = sum(Weight)) %>%
-  distinct()
-
-totalReligionWeight <- tibbie %>%
-  right_join(totalWeight) %>%
-  mutate(Religion_Weight = Religion * Weight) %>%
-  summarize(Total_Religion_Weight = sum(Religion_Weight)) %>%
-  distinct()
-
-totalGodWeight <- tibbie %>%
-  right_join(totalWeight) %>%
-  mutate(God_Weight = God * Weight) %>%
-  summarize(Total_God_Weight = sum(God_Weight)) %>%
-  distinct()
-
-proportionNone <- totalReligionWeight %>%
-  right_join(totalWeight) %>%
-  transmute(State, Proportion_None = (Total_Weight - Total_Religion_Weight) / Total_Weight) # These values are off by +- 2% of the official cross tabs given by Pew, but clearly this roundabout way of weighting is "relatively" accurate
-
-proportionNoGod <- totalGodWeight %>%
-  right_join(totalWeight) %>%
-  transmute(State, Proportion_NoGod = (Total_Weight - Total_God_Weight) / Total_Weight) # These values appear to be "exactly" the same as the official cross tabs. How the same procedure can exist in a quantum state of correctly and incorrectly weighting is left as an exercise to the reader.
-
-state.regions %>%
-  right_join(proportionNone, by = c("fips.numeric" = "State")) %>%
-  right_join(proportionNoGod, by = c("fips.numeric" = "State")) %>%
-  select(-c("abb", "fips.numeric", "fips.character")) %>%
-	write_csv("./output/states_religion.csv")
-
-rm(proportionNoGod, proportionNone)
-```
-
-Words about religion.
-
-\
-
-```{r confederateData, echo = FALSE, message = FALSE, warning = FALSE}
-monuments <- read_csv("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv") %>%
-  slice(2:36) %>%
-  select("COUNTA of feature_name", X14) %>%
-  rename(State = "COUNTA of feature_name", Monuments = X14) %>%
-  group_by(State) %>%
-  filter(!is.na(Monuments)) %>%
-  mutate(Monuments = as.numeric(Monuments)) %>%
-  filter(State != "Grand Total")
-
-georgia <- filter(monuments, State == "Georgia")
-
-monuments <- mutate(monuments, Monuments = if_else(State == "GA", Monuments + georgia$Monuments, Monuments)) %>%
-  filter(State != "Georgia") %>%
-  left_join(state.regions, by = c("State" = "abb")) %>%
-  ungroup() %>%
-  select(region, Monuments)
-
-full_join(monuments, statePop, by =  "region") %>%
-  transmute(region, Per_Capita_Monuments = if_else(is.na(Monuments), 0, Monuments / pop)) %>%
-	write_csv("./output/states_monuments.csv")
-
-rm(georgia, monuments)
-```
-
-Words about monuments.
-
-\
-
-```{r wholeFoodsData, echo = FALSE, message = FALSE}
-read_csv("./raw_data/states_whole_foods.csv") %>%
-  inner_join(state.regions, by = c("State" = "abb")) %>%
-  right_join(statePop, by = "region") %>%
-  transmute(region, Per_Capita_Whole_Foods = Number_Whole_Foods / pop) %>%
-	write_csv("./output/states_whole_foods.csv")
-```
-
-Words about Whole Foods.
