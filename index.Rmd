@@ -98,9 +98,14 @@ if(!file.exists("./raw_data/LLCP2018.XPT")) {
 }
 
 # Political Data
-#if(!file.exists("./raw_data/States-Governors.csv")) {
-#  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
-#}
+if(!file.exists("./raw_data/States-Governors.csv")) {
+  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
+}
+
+# Metropolitan Statistical Areas
+if(!file.exists("./figures/msa.gif")) {
+  wget(url = "https://www2.census.gov/geo/maps/metroarea/us_wall/Feb2013/cbsa_us_0213_large.gif", destfile = "./figures/msa.gif", mode = "wb")
+}
 
 # Religious Data
 if(!file.exists("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav")) {
@@ -486,30 +491,6 @@ write_csv("./output/cdc_state_covid_age_race_data.csv")
 rm(ny, nyc)
 ```
 
-```{r tidyBRFSSData}
-data("state.regions")
-select(state.regions, region, `_STATE` = fips.numeric) %>%
-  left_join(read_xpt("./raw_data/LLCP2018.XPT"), by = "_STATE") %>%
-  select(weight = `_LLCPWT`, #Statistical Raking Weight
-      	 region, # State
-      	 race = `_RACEG21`, #1 Non-Hispanic White, 2 Other, 9 NA
-      	 bmi = `_BMI5`, #BMI; BMI * 100
-      	 cost_doctor = MEDCOST, # Unable to see doctor for cost in year; 1 Yes, 2 No, 7/9 NA
-      	 infarction = CVDINFR4, # Ever had heart attack; 1 Yes, 2 No, 7/9 NA
-      	 stroke = CVDSTRK3, # Ever had stroke; 1 Yes, 2 No, 7/9 NA
-      	 asthma = ASTHMA3, # Ever had asthma; 1 Yes, 2 No, 7/9 NA
-      	 copd = CHCCOPD1, # Ever had COPD; 1 Yes, 2 No, 7/9 NA
-      	 kidney = CHCKDNY1, # Ever had kidney disease; 1 Yes, 2 No, 7/9 NA
-      	 brimley = DIABETE3, # Ever had diabetes; 1 Yes, 4 Prediabetes, 2/3 No, 7/9 NA
-      	 smoker = SMOKE100, # Ever smoked at least 100 cigs; 1 Yes, 2 No, 7/9 NA
-         smoke = SMOKDAY2, # Do you smoke daily; 1 Yes, 2 Sorta, 3 No, 7/9 NA
-      	 flu = FLUSHOT6, # Flu shot in last year; 1 Yes, 2 No, 7/9 NA
-      	 vax = PNEUVAC4, # Ever had pneumonia vaccine; 1 Yes, 2 No, 7/9 NA
-         age = `_AGEG5YR` 
-  	) %>%
-  write_csv("./output/BRFSS.csv")
-```
-
 ---
 
 ## Introduction
@@ -542,7 +523,7 @@ Data is absent for Vermont, Montana, Wyoming, Alaska, and Hawaii.
 pop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
   transmute(region = tolower(State), value = `Non-White_Pop`) %>%
   StateChoropleth$new()
-pop$title = "Proportion of non-White"
+pop$title = "Proportion of Population that is non-White"
 pop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 2, name = "Proportion of Population", drop = FALSE, na.value = "black")
 pop$show_labels = FALSE
 pop$render()
@@ -823,6 +804,314 @@ read_csv("./raw_data/States-Governors.csv") %>%
 ```{r table3}
 # ANOVA party
 ```
+
+\
+
+---
+
+\
+
+## Health Data
+
+```{r tidyBRFSSData}
+data("state.regions")
+select(state.regions, region, `_STATE` = fips.numeric) %>%
+  left_join(read_xpt("./raw_data/LLCP2018.XPT"), by = "_STATE") %>%
+  select(weight = `_LLCPWT`, #Statistical Raking Weight
+      	 region, # State
+      	 race = `_RACEG21`, #1 Non-Hispanic White Onlly, 2 Other, 9 NA
+      	 metro = `_METSTAT`, # In metro county; 1 yes, 2 No
+      	 urban = MSCODE, # 1/2 in metro or metro county, 3/5 suburban/rural
+      	 vax = PNEUVAC4, # Ever had pneumonia vaccine; 1 Yes, 2 No, 7/9 NA
+         asthma = ASTHNOW, # Have asthma now; 1 Yes, 2 No, 7/9 NA
+         age = `_AGEG5YR` 
+  	) %>%
+  write_csv("./output/BRFSS.csv")
+```
+
+```{r manipulateBRFSSData}
+BRFSS <- read_csv("./output/BRFSS.csv") %>%
+# Splitting the BRFSS data by age bracket, with some abuse of good statistical practice, but only a little
+  mutate(age = if_else(age == 2 | age == 3, "25-34 years",
+                       if_else(age == 4 | age == 5, "35-44 years",
+                               if_else(age == 6 | age == 7, "45-54 years",
+                                       if_else(age == 8 | age == 9, "55-64 years",
+                                               if_else(age == 10 | age == 11, "65-74 years",
+                                                       if_else(age == 12 | age == 13, "75-84 years",
+                                                               "NA")))))),
+# Simplifying race variable
+         isWhite = if_else(race == 1, TRUE,
+                        if_else(race == 2, FALSE,
+                                NA))) %>%
+  filter(!is.na(isWhite)) %>%
+  filter(age != "NA")
+
+# Calculating Proportion of State that is in metro region
+met_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(metro == 1) %>%
+  summarize(metro_yes = sum(weight))
+met_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(metro == 2) %>%
+  summarize(metro_no = sum(weight))
+prop_met <- left_join(met_yes, met_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_metro = metro_yes / (metro_yes + metro_no)) %>%
+  select(region, age, isWhite, prop_metro)
+rm(met_yes, met_no)
+
+# Calculating Proportion of State that is in metro region, excluding suburbs
+urb_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(urban == 1 | urban == 2) %>%
+  summarize(urban_yes = sum(weight))
+urb_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(urban == 3 | urban == 5) %>%
+  summarize(urban_no = sum(weight))
+prop_urb <- left_join(urb_yes, urb_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_urban = urban_yes / (urban_yes + urban_no)) %>%
+  select(region, age, isWhite, prop_urban)
+rm(urb_yes, urb_no)
+
+# Calculating Proportion of State that has been vaccinated against pneumonia
+pneu_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(vax == 1) %>%
+  summarize(vax_yes = sum(weight))
+pneu_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(vax == 2) %>%
+  summarize(vax_no = sum(weight))
+prop_pneu <- left_join(pneu_yes, pneu_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_vax = vax_yes / (vax_yes + vax_no)) %>%
+  select(region, age, isWhite, prop_vax)
+rm(pneu_yes, pneu_no)
+
+# Calculating Proportion of State that has asthma
+as_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(asthma == 1) %>%
+  summarize(asthma_yes = sum(weight))
+as_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(asthma == 2) %>%
+  summarize(asthma_no = sum(weight))
+prop_as <- left_join(as_yes, as_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_asthma = asthma_yes / (asthma_yes + asthma_no)) %>%
+  select(region, age, isWhite, prop_asthma)
+rm(as_yes, as_no)
+
+read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
+  group_by(region, age) %>%
+  filter(!(age %in% c("Under 1 year", "1-4 years", "5-14 years", "15-24 years"))) %>%
+  transmute(white_deaths_per_100k =100000.0 * (White) / (Pop_White),
+            nonwhite_deaths_per_100k =100000.0 * (`Non-White`) / (`Pop_Non-White`)) %>%
+  left_join(prop_met, by = c("region", "age")) %>%
+  left_join(prop_urb, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_as, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_pneu, by = c("region", "age", "isWhite")) %>%
+  mutate(deaths_per_100k = if_else(isWhite, white_deaths_per_100k, nonwhite_deaths_per_100k)) %>%
+  filter(!is.na(deaths_per_100k)) %>%
+  write_csv("./output/state_health.csv") %>%
+  transmute(State = paste(toupper(substring(strsplit(region, " ")[[1]], 1, 1)), substring(strsplit(region, " ")[[1]], 2), sep = "", collapse = " "),
+            `Age Bracket` = age,
+            `Racial Group` = if_else(isWhite, "White", "Not Non-Hispanic White Only"),
+            `Deaths per 100,000 Population` = round(deaths_per_100k, 1),
+            `Percent Metropolitan` = round(100.0 * prop_metro, 2),
+            `Percent Urban` = round(100.0 * prop_urban, 2),
+            `Percent Asthma` = round(100.0 * prop_asthma, 2),
+            `Percent Pneumonia Vaccine` = round(100.0 * prop_vax, 2)) %>%
+  mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
+  ungroup() %>%
+  select(-region, age) %>%
+  write_csv("./output/state_health_trimmed.csv")
+  
+rm(prop_met, prop_urb, prop_pneu, prop_as, BRFSS)
+```
+
+```{r graphVax, include = TRUE, fig.cap = "**Figure:**"}
+data <- read_csv("./output/state_health.csv") %>%
+  filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
+  inner_join(state.regions, by = "region")
+
+old <- paste("Slope: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+older <- paste("Slope: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_vax ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "65-74 years", old, older), y = if_else(age == "65-74 years", 300, 1100))
+
+ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125, aes(y = deaths_per_100k + 3)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y  = element_line(size = 1.03125),
+        panel.background = element_rect(fill = "#EEEEEE"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs Pneumonia Vaccination by State",
+       subtitle = "Among Elderly non-White Population",
+       x = "Percent Vaccinated against Pneumonia",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(85, data$y))
+```
+
+Words.
+
+```{r graphAsthma, include = TRUE, fig.cap = "**Figure:**"}
+data <- read_csv("./output/state_health.csv") %>%
+  filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
+  inner_join(state.regions, by = "region")
+
+old <- paste("Slope: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+older <- paste("Slope: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_asthma ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "65-74 years", old, older), y = if_else(age == "65-74 years", 450, 1100))
+
+ggplot(data, aes(100 * prop_asthma, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125, aes(y = deaths_per_100k + 3)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y  = element_line(size = 1.03125),
+        panel.background = element_rect(fill = "#EEEEEE"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs Prevalence of Asthma by State",
+       subtitle = "Among Elderly non-White Population",
+       x = "Percent with Asthma",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(35, data$y))
+```
+
+Words.
+
+### Metro
+
+Words about metro and suburban.
+
+[Metropolitan Statistical Areas](https://www2.census.gov/geo/maps/metroarea/us_wall/Feb2013/cbsa_us_0213_large.gif)
+
+```{r graphMetro, include = TRUE, fig.cap = "**Figure:**"}
+data <- read_csv("./output/state_health.csv") %>%
+  filter(!isWhite) %>%
+  inner_join(state.regions, by = "region")
+
+younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~  prop_metro, filter(data, age == "25-34 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
+young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
+youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
+oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "25-34 years", younger,
+                                   if_else(age == "35-44 years", young,
+                                           if_else(age == "45-54 years", youngish,
+                                                   if_else(age == "55-64 years", oldish,
+                                                           if_else(age == "65-74 years", old,
+                                                                   older))))),
+               y = if_else(age == "25-34 years", 5,
+                                   if_else(age == "35-44 years", 20,
+                                           if_else(age == "45-54 years", 50,
+                                                   if_else(age == "55-64 years", 100,
+                                                           if_else(age == "65-74 years", 300,
+                                                                   750))))))
+
+ggplot(data, aes(100 * prop_metro, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125, aes(y = deaths_per_100k)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs\nPopulation in Metropolitan Counties by State",
+       subtitle = "Among non-White Population",
+       x = "Percent living in Metropolitan Counties",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(15, data$y)) +
+  ggsave("./figures/state_metro.png", height = 14, width = 7)
+```
+Words.
+
+```{r graphUrban, include = TRUE, fig.cap = "**Figure:**"}
+data <- read_csv("./output/state_health.csv") %>%
+  filter(!isWhite) %>%
+  inner_join(state.regions, by = "region")
+
+younger <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
+young <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
+youngish <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
+oldish <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
+old <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+older <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
+                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
+                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "25-34 years", younger,
+                                   if_else(age == "35-44 years", young,
+                                           if_else(age == "45-54 years", youngish,
+                                                   if_else(age == "55-64 years", oldish,
+                                                           if_else(age == "65-74 years", old,
+                                                                   older))))),
+               y = if_else(age == "25-34 years", 5,
+                                   if_else(age == "35-44 years", 20,
+                                           if_else(age == "45-54 years", 50,
+                                                   if_else(age == "55-64 years", 100,
+                                                           if_else(age == "65-74 years", 300,
+                                                                   750))))))
+
+ggplot(data, aes(100 * prop_urban, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125, aes(y = deaths_per_100k)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs\nPopulation in non-Suburban Metropolitan Counties by State",
+       subtitle = "Among non-White Population",
+       x = "Percent living in non-Suburban Metropolitan Areas",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(15, y)) +
+  ggsave("./figures/state_urban.png", height = 14, width = 7)
+```
+
+Words.
 
 ---
 
