@@ -52,9 +52,6 @@ library(readxl)
 library(haven)
 library(htmltools)
 
-# This function makes the ggplot maps play nice with the names of counties
-source("./R/fipsCoercer.R")
-
 # This function commits great crimes against strings and tibbles
 # It reads a tibble, brute-forces the tibble into an html file and saves it
 # The javascript sorting function behaves alphabetically, rather than numerically
@@ -111,8 +108,8 @@ if(!file.exists("./figures/msa.gif")) {
 }
 
 # Voting Data from 2016 POTUS Election
-if(!file.exists("./raw_data/States-Votes.xlsx")) {
-  download.file(url = "https://www.fec.gov/documents/1890/federalelections2016.xlsx", destfile = "./raw_data/States-Votes.xlsx", mode = "wb", quiet = TRUE) 
+if(!file.exists("./raw_data/states_votes.xlsx")) {
+  download.file(url = "https://www.fec.gov/documents/1890/federalelections2016.xlsx", destfile = "./raw_data/states_votes.xlsx", mode = "wb", quiet = TRUE) 
 }
 
 # Religious Data
@@ -132,6 +129,12 @@ if(!file.exists("./raw_data/states_whole_foods.csv")) {
 if(!file.exists("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv")) {
   wget(url = "https://docs.google.com/spreadsheets/d/1W4H2qa2THM1ni53QYZftGob_k_Bf9HreFAtCERfjCIU/export?format=csv&id=1W4H2qa2THM1ni53QYZftGob_k_Bf9HreFAtCERfjCIU&gid=534759525", destfile = "./raw_data/Whose Heritage SF - Symbol Type Count by State.csv")
 }
+
+# Census Regions
+if(!file.exists("./raw_data/us_regdiv.pdf")) {
+  wget(url = "https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf", destfile = "./raw_data/us_regdiv.pdf")
+}
+
 ```
 
 ```{r tidyNewYorkData}
@@ -504,25 +507,22 @@ rm(ny, nyc)
 ## Introduction
 
 This report is a data analysis investigation into racial disparity in deaths from COVID-19 in the United States.
+
 NOTE: Throughout the report the population is separated into two groups, "non-Hispanic White only", and "not Non-Hispanic White only", based on Census categories. For lack of a more feasible racially-sensitive construct, these will be referred to as "White" and "non-White", respectively. Any analyses including "Hispanic Whites" in "White", or not limiting to "White only", or using any other racial groupings, could reach different, equally-valid conclusions.
 
 \
 
 ---
 
-\
-
 ## Race Data
 
 The data on population and racial breakdowns by states come from the Census. The [Annual State Resident Population Estimates for 6 Race Groups (5 Race Alone Groups and Two or More Races) by Age, Sex, and Hispanic Origin](https://www2.census.gov/programs-surveys/popest/technical-documentation/file-layouts/2010-2019/sc-est2019-alldata6.pdf) document from 2020 gives the estimates as of 2020-07-01, the most recent publicly available figures.
 
-\
-
 The data on COVID deaths by race, state, and age, come from the [Provisional Death Counts for Coronavirus Disease (COVID-19): Weekly State-Specific Data Updates](https://data.cdc.gov/NCHS/Provisional-Death-Counts-for-Coronavirus-Disease-C/pj7m-y5uh), which is produced by the National Center for Health Statistics division of the CDC, using data from the National Vital Statistics System.
 
-\
-
 Data is absent for Vermont, Montana, Wyoming, Alaska, and Hawaii.
+
+\
 
 ### Maps
 
@@ -531,8 +531,8 @@ Data is absent for Vermont, Montana, Wyoming, Alaska, and Hawaii.
 pop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
   transmute(region = tolower(State), value = `Non-White_Pop`) %>%
   StateChoropleth$new()
-pop$title = "Proportion of Population that is non-White"
-pop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 2, name = "Proportion of Population", drop = FALSE, na.value = "black")
+pop$title = "Percentage of Population that is non-White"
+pop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 2, name = "Percent\nPopulation", drop = FALSE, na.value = "black")
 pop$show_labels = FALSE
 pop$render()
 ```
@@ -544,8 +544,8 @@ Figure 1 shows the concentration of non-White populations as a percentage of tot
 prop <- read_csv("./output/cdc_state_covid_race_data.csv") %>%
   transmute(region = tolower(State), value = `Non-White_Dist`) %>%
   StateChoropleth$new()
-prop$title = "Proportion of COVID Deaths from non-White Population"
-prop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 8, name = "Proportion of Deaths", drop = FALSE, na.value = "black")
+prop$title = "Percent of COVID Deaths from non-White Population"
+prop$ggplot_scale = scale_fill_brewer(type = "seq", palette = 8, name = "Percent\nDeaths", drop = FALSE, na.value = "black")
 prop$show_labels = FALSE
 prop$render()
 ```
@@ -572,7 +572,7 @@ ggplot(states) +
   expand_limits(x = states$long, y = states$lat) +
   scale_fill_gradient2(name = "RDI",
                       low = "blue",
-                      mid = "grey",
+                      mid = "#666666",
                       midpoint = 1.0,
                       high = "red",
                       na.value = "black") +
@@ -580,22 +580,21 @@ ggplot(states) +
         axis.text.y = element_blank(),
         axis.ticks = element_blank(),
         legend.position = "bottom") +
-  xlab("") + ylab("") +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population") +
-ggsave("./figures/ratio_state.png")
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population",
+       subtitle = "Among non-White Population",
+       x = "",
+       y = "") +
+  coord_map() +
+  ggsave("./figures/ratio_state.png")
 ```
 
-As indicated in Figure 3, the RDI is low in a few states, somewhat elevated in most states, and extremely high in some states.
-
-\
+As indicated in Figure 3, the RDI is low in a few states, somewhat elevated in the majority of states, and extremely high in some states.
 
 Those states with the lowest RDIs (West Virginia, Maine, and New Hampshire) are the least diverse states in the nation. They are also among the states with the fewest overall deaths; none has more than a few hundred COVID deaths total. This combination of factors has led them to not experience a single reported non-White COVID death.
 
-\
+Those states with the highest RDIs include New York, Wisconsin, Utah, Michigan, and Missouri (see Table 1 and figure 8).
 
-Those states with the highest RDIs include New York, Wisconsin, Utah, Michigan, and Missouri.
-
-```{r mapRatioCountyMichigan, include = TRUE,  fig.cap = "**Figure 4:** A map of the Racial Disparity Index for Michigan"}
+```{r mapRatioCountyMichigan, include = TRUE,  fig.cap = "**Figure 4:** A Map of the Racial Disparity Index for Michigan"}
 # This is the same idea, but using the limited county-specific data
 
 data <- read_csv("./output/cdc_county_covid_race_data.csv") %>%
@@ -628,7 +627,7 @@ ggplot(filter(mapData, region == "michigan"), aes(x = long,
   theme_void() +
   scale_fill_gradient2(name = "RDI",
                       low = "blue",
-                      mid = "grey",
+                      mid = "#666666",
                       high = "red",
                       midpoint = 1,
                       na.value = "black") +
@@ -636,13 +635,15 @@ ggplot(filter(mapData, region == "michigan"), aes(x = long,
         axis.text.y = element_blank(),
         axis.ticks = element_blank(),
         legend.position = "bottom") +
-  xlab("") + ylab("") +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population in Michigan") +
-  coord_map()
-ggsave("./figures/ratio_county_mi.png")
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population",
+       subtitle = "Among non-White Population in Michigan",
+       x = "",
+       y = "") +
+  coord_map() +
+  ggsave("./figures/ratio_county_mi.png", width = 6, height = 6)
 ```
 
-```{r mapRatioCountyNewYork, include = TRUE, fig.cap = "**Figure 5:** A map of the Racial Disparity Index for New York"}
+```{r mapRatioCountyNewYork, include = TRUE, fig.cap = "**Figure 5:** A Map of the Racial Disparity Index for New York"}
 ggplot(filter(mapData, region == "new york"), aes(x = long,
                     y = lat,
                     group = group)) +
@@ -650,7 +651,7 @@ ggplot(filter(mapData, region == "new york"), aes(x = long,
   theme_void() +
   scale_fill_gradient2(name = "RDI",
                       low = "blue",
-                      mid = "grey",
+                      mid = "#666666",
                       high = "red",
                       midpoint = 1,
                       na.value = "black") +
@@ -658,27 +659,33 @@ ggplot(filter(mapData, region == "new york"), aes(x = long,
         axis.text.y = element_blank(),
         axis.ticks = element_blank(),
         legend.position = "bottom") +
-  xlab("") + ylab("") +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population in New York") +
-  coord_map()
-ggsave("./figures/ratio_county_ny.png")
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population",
+       subtitle = "Among non-White Population in New York",
+       x = "",
+       y = "") +
+  coord_map() +
+  ggsave("./figures/ratio_county_ny.png", width = 7, height = 6)
 ```
 
-For those worst states, the RDI seems to be worst in bigger cities like New York City, Detroit, Flint, and Grand Rapids (figures 4 and 5).
+Among those worst states, the RDI seems to be worse in bigger cities like New York City, Detroit, Flint, and Grand Rapids (see figures 4 and 5).
 
 \
-
-What did we learn here?
 
 ---
 
 ### Age Differences
 
-The RDI varies somewhat by age bracket. The RDI for each age bracket was calculated for each Census Region (see figure 6 for a map of Census Regions).
+The RDI varies somewhat by age bracket. The RDI for each age bracket was calculated for each Census Region.
 
-**Here goes a picture of the Census Regions**
+`r png::writePNG(pdf_render_page("./raw_data/us_regdiv.pdf", page = 1, dpi = 300),"./figures/census_regions.png")`
 
-Figure 7 shows the differences and trends in age-based RDI for the different Census Regions. NOTE: The figure does not average by state values, but across the entire region, so larger states are more influential.
+![Census Regions](./figures/census_regions.png)
+**Figure 6:** Census Regions and Divisions of the United States
+
+\
+
+Figure 7 shows the differences and trends in age-based RDI for the different Census Regions.
+NOTE: The figure does not average by state values, but across the entire region, so larger states are more influential.
 
 ```{r plotCOVIDAgeRaceCensusRegion, include = TRUE, fig.cap = "**Figure 7:** RDI for each Census Region plotted by age bracket midpoint"}
 # Plots Ratio by Census Region
@@ -693,27 +700,36 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
        x = "Age Bracket Midpoint",
        y = "RDI") +
   theme_linedraw() +
-  ylim(0, 4)
+  ylim(0, 4) +
+  ggsave("./figures/rdi_regions.png")
 ```
 
 The horizontal line at 1 is because there were no reported COVID deaths at all for that age group, not because of any actual racial parity. For all regions the general trend was a high, relatively stable RDI with a slight decrease toward parity with increasing age.
 
-```{r plotCOVIDStates, include = TRUE, fig.cap=""}
+```{r plotCOVIDStates, include = TRUE, fig.cap = "**Figure 8:** RDI for each Census Region by Age and State"}
 # Plots Ratio by State, grouped by Census Region
-read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
+data <- read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
   group_by(region, ageNum) %>%
   summarize(`Census Region`, pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
   mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
-  ggplot(aes(x = ageNum, y = pop_avg, color = region)) +
-  geom_line(size = 1.5) +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population\nby Age and Census Region",
-       x = "Age Bracket Midpoint",
+  inner_join(state.regions, by = "region") %>%
+  filter(!(pop_avg > 0.9999 & pop_avg < 1.0001))
+
+ggplot(data, aes(x = ageNum, y = pop_avg, fill = region)) +
+#  geom_point(size = 5, width = 5) +
+  geom_label(label = data$abb, color = "white", size = 2.125, label.r = unit(2, "mm"), show.legend = FALSE, alpha = 0.75) +
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nby Age and Census Region",
+       subtitle = "Among non-White Population",
+       x = "Age",
        y = "RDI") +
   theme_linedraw() +
-  facet_grid(`Census Region` ~ .)
+  facet_wrap(~ `Census Region`) +
+  ggsave("./figures/state_regions.png", height = 10, width = 7)
 ```
 
-Make this graph like fifty times taller. Then compare to previous, as it is simply a more granular version.
+Figure 8 shows the individual contributions of each state, with empty values (no COVID deaths for that state and age recorded in the dataset) removed for clarity.
+
+\
 
 ---
 
@@ -773,9 +789,9 @@ htmltools::includeHTML("./output/state_data_table.html") # Pastes html table int
 
 \
 
-Table 1 gives the RDI age breakdowns and Governor info for each state. Figures 8 and 9 show that information plotted by Governor sex and party, respectively. The female-led states with worse RDIs (Michigan, Kansas, Iowa) had higher populations, leading to the **significantly?** increased RDI averages (see table 2). For both male-led states and states of either party (regardless of Governor sex), the RDIs were approximately 2 for all ages with reported COVID deaths. As of yet, the party of the Governor appears to make no significant difference (see table 3) in racial disparity in COVID deaths. Whether this is surprising or not is left as an exercise to the reader.
+Table 1 gives the RDI age breakdowns and Governor information for each state. Figures 9 and 10 show that information plotted by Governor sex and party, respectively. The female-led states with worse RDIs (Michigan, Kansas, Iowa) had higher populations, leading to the increased but not statistically-significant RDI averages (see table 2). For both male-led states and states of either party (regardless of Governor sex), the RDIs were approximately 2 for all ages with reported COVID deaths. As of yet, the party of the Governor appears to make no significant difference (see table 3) in racial disparity in COVID deaths. Whether this is surprising or not is left as an exercise to the reader.
 
-```{r plotCOVIDGovernorSex, include = TRUE, fig.cap = "**Figure**"}
+```{r plotCOVIDGovernorSex, include = TRUE, fig.cap = "**Figure 9:** RDI of States Plotted by Age and Sex of Governor"}
 # By Governor Sex
 read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
@@ -786,15 +802,17 @@ read_csv("./raw_data/states_governors.csv") %>%
   mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
   ggplot(aes(x = ageNum, y = pop_avg, color = Gov_Male)) +
   geom_line(size = 3) +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population\nby Age Group and Governor Sex",
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nby Age and Governor Sex",
+       subtitle = "Among non-White Population",
        x = "Age",
        y = "RDI") +
   scale_color_discrete(name = "Governor Sex",
                        labels = c("Female", "Male")) +
-  theme_linedraw()
+  theme_linedraw() +
+  ggsave("./figures/governor_sex.png")
 ```
 
-```{r plotCOVIDGovernorParty, include = TRUE, fig.cap = "**Figure**"}
+```{r plotCOVIDGovernorParty, include = TRUE, fig.cap = "**Figure 10:** RDI of States Plotted by Age and Party of Governor"}
 # By Governor Party
 read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
@@ -805,39 +823,62 @@ read_csv("./raw_data/states_governors.csv") %>%
   mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
   ggplot(aes(x = ageNum, y = pop_avg, color = !Gov_Rep)) +
   geom_line(size = 3) +
-  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population\nby Age Group and Governor Party",
+  labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nby Age and Governor Party",
+       subtitle = "Among non-White Population",
        x = "Age",
        y = "RDI") +
   scale_color_discrete(name = "Governor Party",
                        labels = c("Republican", "Democrat")) +
-  theme_linedraw()
+  theme_linedraw() +
+  ggsave("./figures/governor_party.png")
 ```
 
 \
 
-```{r table2}
-# ANOVA sex
+```{r governorSexANOVA, include = TRUE, fig.cap = "**Table 2:** Analysis of Variance of Sex of State Governor vs RDI"}
+data <- read_csv("./raw_data/states_governors.csv") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  select(region, Gov_Male) %>%
+  right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
+  group_by(ageNum, Gov_Male) %>%
+  summarize(pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  filter(ageNum >= 20.0) %>%
+  rename(`Governor Sex` = Gov_Male)
+
+kable(anova(lm(pop_avg ~ `Governor Sex`, data)))
 ```
 
 \
 
-```{r table3}
-# ANOVA party
+```{r governorPartyANOVA, include = TRUE, fig.cap = "**Table 3:** Analysis of Variance of Sex of State Governor vs RDI"}
+data <- read_csv("./raw_data/states_governors.csv") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  select(region, Gov_Rep) %>%
+  right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
+  group_by(ageNum, Gov_Rep) %>%
+  summarize(pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
+  mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
+  filter(ageNum >= 20.0) %>%
+  rename(`Governor Party` = Gov_Rep)
+
+kable(anova(lm(pop_avg ~ `Governor Party`, data)))
 ```
 
-# TODO
+\
 
-ANOVAs
+Tables 2 and 3 show that neither the sex nor the party of a state's governor makes a statistically significant contribution to racial disparity in COVID deaths.
 
 \
 
 ---
 
-\
-
 ## Health Data
 
+Using data from the [Behavioral Risk Factor Surveillance System](https://www.cdc.gov/brfss/index.html), data about health factors and living condition of the non-White population were analyzed. Figure 11 shows the significant negative correlation between pneumonia vaccination and per capita COVID deaths among the elderly non-White population. The correlations were similarly negatively-correlated for the elderly White population, but orders of magnitude weaker (data not shown).
+
 ```{r tidyBRFSSData}
+# WARNING: This is a LOT of data, and a LOT of writing. You have been warned, Hard Disk users.
 data("state.regions")
 select(state.regions, region, `_STATE` = fips.numeric) %>%
   left_join(read_xpt("./raw_data/LLCP2018.XPT"), by = "_STATE") %>%
@@ -961,7 +1002,7 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
 rm(prop_met, prop_urb, prop_rur, prop_pneu, prop_as, BRFSS)
 ```
 
-```{r graphVax, include = TRUE, fig.cap = "**Figure:**"}
+```{r graphVax, include = TRUE, fig.cap = "**Figure: 11:** "}
 data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
@@ -1035,7 +1076,7 @@ Health Commentary
 
 Words about metro and suburban.
 
-[Metropolitan Statistical Areas](https://www2.census.gov/geo/maps/metroarea/us_wall/Feb2013/cbsa_us_0213_large.gif)
+![Metropolitan Statistical Areas](./figures/msa.gif)
 
 ```{r graphMetro, include = TRUE, fig.cap = "**Figure:**"}
 data <- read_csv("./output/state_health.csv") %>%
@@ -1123,7 +1164,6 @@ ggplot(data, aes(100 * prop_metro, deaths_per_100k)) +
   geom_label(label = data$lab, aes(15, data$y)) +
   ggsave("./figures/state_metro.png", height = 14, width = 7)
 ```
-Words.
 
 ```{r graphUrban, include = TRUE, fig.cap = "**Figure:**"}
 data <- read_csv("./output/state_health.csv") %>%
@@ -1212,8 +1252,6 @@ ggplot(data, aes(100 * prop_urban, deaths_per_100k)) +
   ggsave("./figures/state_urban.png", height = 14, width = 7)
 ```
 
-Words.
-
 ```{r graphRural, include = TRUE, fig.cap = "**Figure:**"}
 data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
@@ -1299,15 +1337,106 @@ ggplot(data, aes(100 * prop_rural, deaths_per_100k)) +
        y = "Deaths per 100k Population") +
   geom_label(label = data$lab, aes(15, y)) +
   ggsave("./figures/state_rural.png", height = 14, width = 7)
+```
+
+```{r graphPopDensity, include = TRUE, fig.cap = "**Figure:**"}
+statePop <- read_csv("./raw_data/sc-est2019-alldata6.csv") %>%
+    filter(SEX == 0 & ORIGIN == 0) %>%
+    group_by(NAME) %>%
+    summarize(pop = sum(POPESTIMATE2019)) %>%
+    transmute(region = tolower(NAME), pop)
+
+data <- filter(statePop, region != "district of columbia") %>%
+  bind_cols(tibble(state.area)) %>%
+  transmute(region, density = pop / state.area) %>%
+  inner_join(state.regions, by = "region") %>%
+  inner_join(read_csv("./output/state_health.csv") %>% filter(!isWhite))
+
+younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "25-34 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "25-34 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "25-34 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "25-34 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
+
+young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "35-44 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "35-44 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "35-44 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "35-44 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
+
+youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "45-54 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "45-54 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "45-54 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "45-54 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
+
+oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "55-64 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "55-64 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "55-64 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "55-64 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
+
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ density, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ density, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "25-34 years", younger,
+                                   if_else(age == "35-44 years", young,
+                                           if_else(age == "45-54 years", youngish,
+                                                   if_else(age == "55-64 years", oldish,
+                                                           if_else(age == "65-74 years", old,
+                                                                   older))))),
+               y = if_else(age == "25-34 years", 9,
+                                   if_else(age == "35-44 years", 38,
+                                           if_else(age == "45-54 years", 92,
+                                                   if_else(age == "55-64 years", 262,
+                                                           if_else(age == "65-74 years", 625,
+                                                                   1234))))))
+
+ggplot(data, aes(density, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs\nPopulation Density by State",
+       subtitle = "Among non-White Population",
+       x = "Population Density (People / sq mi)",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(505, data$y)) +
+  ggsave("./figures/state_density.png", height = 14, width = 7)
 
 rm(younger, young, youngish, oldish, old, older, data)
 ```
 
-Words.
-
-# TODO
-
-Urban Rural Commentary
+As shown in figures x-x, several measures of density are significantly correlated with the severity of COVID pandemic. Statewide measures of the percentage of the population living in metropolitan areas, including (figure x) or excluding (figure x) the suburbs, showed strong positive relationships with per capita deaths from COVID among non-White populations of all ages. The expected opposite trend holds for the statewide percentage of the population living in rural areas (figure x). More directly, population density (figure x) showed the strongest correlation with per capita COVID deaths across all age groups, races, and variables investigated (data not shown). These data are in line with the expectation that human-to-human diseases kill most readily in areas where humans are closer together.
 
 ---
 
@@ -1320,7 +1449,7 @@ Here goes all the random little things to look into (Whole Foods, religion, etc.
 \
 
 ```{r electionData, echo = FALSE, message = FALSE}
-read_excel("./raw_data/States-Votes.xlsx", sheet = "Table 2. Electoral &  Pop Vote") %>%
+read_excel("./raw_data/states_votes.xlsx", sheet = "Table 2. Electoral &  Pop Vote") %>%
   select(1, 4, 5) %>%
   rename(State = 1, Trump = 2, Clinton = 3) %>%
   slice(4:54) %>%
@@ -1328,7 +1457,7 @@ read_excel("./raw_data/States-Votes.xlsx", sheet = "Table 2. Electoral &  Pop Vo
   mutate(Margin = (Trump - Clinton) / (Trump + Clinton)) %>%
   full_join(read_csv("./raw_data/states_governors.csv"), by = "State") %>%
   select(State, Margin) %>%
-  write_csv("./output/States_info.csv")
+  write_csv("./output/States_votes.csv")
 ```
 
 Words.
@@ -1374,7 +1503,7 @@ state.regions %>%
   right_join(proportionNone, by = c("fips.numeric" = "State")) %>%
   right_join(proportionNoGod, by = c("fips.numeric" = "State")) %>%
   select(-c("abb", "fips.numeric", "fips.character")) %>%
-	write_csv("./output/States_religion.csv")
+	write_csv("./output/states_religion.csv")
 
 rm(proportionNoGod, proportionNone)
 ```
@@ -1399,14 +1528,9 @@ monuments <- mutate(monuments, Monuments = if_else(State == "GA", Monuments + ge
   ungroup() %>%
   select(region, Monuments)
 
-# Close enough to correct estimates of state pop using lazy code copying
-statePop <- read_csv("./output/census_state_age_race_data.csv") %>%
-  group_by(region) %>%
-  summarize(pop = sum(Pop_White + `Pop_Non-White`))
-
 full_join(monuments, statePop, by =  "region") %>%
   transmute(region, Per_Capita_Monuments = if_else(is.na(Monuments), 0, Monuments / pop)) %>%
-	write_csv("./output/States_monuments.csv")
+	write_csv("./output/states_monuments.csv")
 
 rm(georgia, monuments)
 ```
