@@ -3,8 +3,7 @@ title: "COVID Health and Race Trends"
 author: "Mitch Lueken"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
-  html_document:
-    df_print: paged
+  html_document
 ---
 
 <style>
@@ -60,6 +59,10 @@ source("./R/fipsCoercer.R")
 # It reads a tibble, brute-forces the tibble into an html file and saves it
 # The javascript sorting function behaves alphabetically, rather than numerically
 source("./R/makeSortableHTMLTable.R")
+
+# This function does the same, but without the sorting function
+# It also removes NAs and replaces them with empty strings
+source("./R/makeHTMLTable.R")
 ```
 
 ```{r download}
@@ -98,13 +101,18 @@ if(!file.exists("./raw_data/LLCP2018.XPT")) {
 }
 
 # Political Data
-if(!file.exists("./raw_data/States-Governors.csv")) {
-  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-Governors.csv", destfile = "./raw_data/States-Governors.csv")
+if(!file.exists("./raw_data/states_governors.csv")) {
+  wget(url = "https://github.com/luekenm/COVID-19/raw_data/states_governors.csv", destfile = "./raw_data/states_governors.csv")
 }
 
 # Metropolitan Statistical Areas
 if(!file.exists("./figures/msa.gif")) {
   wget(url = "https://www2.census.gov/geo/maps/metroarea/us_wall/Feb2013/cbsa_us_0213_large.gif", destfile = "./figures/msa.gif", mode = "wb")
+}
+
+# Voting Data from 2016 POTUS Election
+if(!file.exists("./raw_data/States-Votes.xlsx")) {
+  download.file(url = "https://www.fec.gov/documents/1890/federalelections2016.xlsx", destfile = "./raw_data/States-Votes.xlsx", mode = "wb", quiet = TRUE) 
 }
 
 # Religious Data
@@ -116,8 +124,8 @@ if(!file.exists("./raw_data/Dataset - Pew Research Center 2014 Religious Landsca
 }
 
 # Whole Foods Data
-if(!file.exists("./raw_data/States-WholeFoods.csv")) {
-  wget(url = "https://github.com/luekenm/COVID-19/raw_data/States-WholeFoods.csv", destfile = "./raw_data/States-WholeFoods.csv")
+if(!file.exists("./raw_data/states_whole_foods.csv")) {
+  wget(url = "https://github.com/luekenm/COVID-19/raw_data/states_whole_foods.csv", destfile = "./raw_data/states_whole_foods.csv")
 }
 
 # Confederate Monument Data
@@ -597,7 +605,19 @@ data <- read_csv("./output/cdc_county_covid_race_data.csv") %>%
 data("county.regions")
 mapData <- county.regions %>%
   transmute(fips = region, region = state.name, subregion = county.name) %>%
-  fipsCoercer() %>%
+  filter(region %in% c("michigan", "new york")) %>%
+  mutate(subregion = if_else((region == "florida" | region == "mississippi") & (subregion == "desoto"), "de soto",
+                if_else((region == "alabama" | region == "georgia" | region == "indiana" | region == "missouri" | region == "tennessee") & (subregion == "dekalb"), "de kalb",
+                        if_else(substr(subregion, 1, 4) == "st. ", paste("st ", substring(subregion, 5), sep = ""),
+                                if_else(substr(subregion, 1, 5) == "ste. ", paste("ste ", substring(subregion, 6), sep = ""),
+                                        if_else((region == "south dakota" & subregion == "oglala lakota"), "shannon",
+                                                if_else((region == "north dakota" & subregion == "lamoure"), "la moure",
+                                                        if_else((region == "illinois" & subregion == "dupage"), "du page",
+                                                                if_else((region == "illinois" & subregion == "lasalle"), "la salle",
+                                                                        if_else((region == "texas" & subregion == "dewitt"), "de witt",
+                                                                                if_else((region == "iowa" & subregion == "o'brien"), "obrien",
+                                                                                        if_else((region == "missouri" & subregion == "city of st. louis"), "st louis city",
+                                                                                                subregion)))))))))))) %>%
   inner_join(map_data("county"), by = c("region", "subregion")) %>%
   full_join(data, by = "fips")
 
@@ -703,7 +723,7 @@ Make this graph like fifty times taller. Then compare to previous, as it is simp
 # As a table
 data("state.regions")
 
-read_csv("./raw_data/States-Governors.csv") %>%
+read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
   select(region, Gov_Male, Gov_Rep) %>%
   right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
@@ -757,7 +777,7 @@ Table 1 gives the RDI age breakdowns and Governor info for each state. Figures 8
 
 ```{r plotCOVIDGovernorSex, include = TRUE, fig.cap = "**Figure**"}
 # By Governor Sex
-read_csv("./raw_data/States-Governors.csv") %>%
+read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
   select(region, Gov_Male) %>%
   right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
@@ -776,7 +796,7 @@ read_csv("./raw_data/States-Governors.csv") %>%
 
 ```{r plotCOVIDGovernorParty, include = TRUE, fig.cap = "**Figure**"}
 # By Governor Party
-read_csv("./raw_data/States-Governors.csv") %>%
+read_csv("./raw_data/states_governors.csv") %>%
   left_join(state.regions, by = c("State" = "abb")) %>%
   select(region, Gov_Rep) %>%
   right_join(read_csv("./output/cdc_state_covid_age_race_data.csv"), by = "region") %>%
@@ -805,6 +825,10 @@ read_csv("./raw_data/States-Governors.csv") %>%
 # ANOVA party
 ```
 
+# TODO
+
+ANOVAs
+
 \
 
 ---
@@ -822,6 +846,7 @@ select(state.regions, region, `_STATE` = fips.numeric) %>%
       	 race = `_RACEG21`, #1 Non-Hispanic White Onlly, 2 Other, 9 NA
       	 metro = `_METSTAT`, # In metro county; 1 yes, 2 No
       	 urban = MSCODE, # 1/2 in metro or metro county, 3/5 suburban/rural
+         rural = `_URBSTAT`, # In Urban or Rural county; 1 Urban, 2 Rural
       	 vax = PNEUVAC4, # Ever had pneumonia vaccine; 1 Yes, 2 No, 7/9 NA
          asthma = ASTHNOW, # Have asthma now; 1 Yes, 2 No, 7/9 NA
          age = `_AGEG5YR` 
@@ -870,6 +895,18 @@ prop_urb <- left_join(urb_yes, urb_no, by = c("region", "age", "isWhite")) %>%
   select(region, age, isWhite, prop_urban)
 rm(urb_yes, urb_no)
 
+# Calculation Proportion of State in Rural counties
+rur_yes <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(rural == 2) %>%
+  summarize(rural_yes = sum(weight))
+rur_no <- group_by(BRFSS, region, age, isWhite) %>%
+  filter(rural == 1) %>%
+  summarize(rural_no = sum(weight))
+prop_rur <- left_join(rur_yes, rur_no, by = c("region", "age", "isWhite")) %>%
+  mutate(prop_rural = rural_yes / (rural_yes + rural_no)) %>%
+  select(region, age, isWhite, prop_rural)
+rm(rur_yes, rur_no)
+
 # Calculating Proportion of State that has been vaccinated against pneumonia
 pneu_yes <- group_by(BRFSS, region, age, isWhite) %>%
   filter(vax == 1) %>%
@@ -901,6 +938,7 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
             nonwhite_deaths_per_100k =100000.0 * (`Non-White`) / (`Pop_Non-White`)) %>%
   left_join(prop_met, by = c("region", "age")) %>%
   left_join(prop_urb, by = c("region", "age", "isWhite")) %>%
+  left_join(prop_rur, by = c("region", "age", "isWhite")) %>%
   left_join(prop_as, by = c("region", "age", "isWhite")) %>%
   left_join(prop_pneu, by = c("region", "age", "isWhite")) %>%
   mutate(deaths_per_100k = if_else(isWhite, white_deaths_per_100k, nonwhite_deaths_per_100k)) %>%
@@ -912,6 +950,7 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
             `Deaths per 100,000 Population` = round(deaths_per_100k, 1),
             `Percent Metropolitan` = round(100.0 * prop_metro, 2),
             `Percent Urban` = round(100.0 * prop_urban, 2),
+            `Percent Rural` = round(100.0 * prop_rural, 2),
             `Percent Asthma` = round(100.0 * prop_asthma, 2),
             `Percent Pneumonia Vaccine` = round(100.0 * prop_vax, 2)) %>%
   mutate(State = if_else(State == "District Of Columbia", "District of Columbia", State)) %>%
@@ -919,7 +958,7 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
   select(-region, age) %>%
   write_csv("./output/state_health_trimmed.csv")
   
-rm(prop_met, prop_urb, prop_pneu, prop_as, BRFSS)
+rm(prop_met, prop_urb, prop_rur, prop_pneu, prop_as, BRFSS)
 ```
 
 ```{r graphVax, include = TRUE, fig.cap = "**Figure:**"}
@@ -988,6 +1027,10 @@ ggplot(data, aes(100 * prop_asthma, deaths_per_100k)) +
 
 Words.
 
+# TODO
+
+Health Commentary
+
 ### Metro
 
 Words about metro and suburban.
@@ -999,23 +1042,52 @@ data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
   inner_join(state.regions, by = "region")
 
-younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~  prop_metro, filter(data, age == "25-34 years")))[[4]][2, 4], 3),
+younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
-young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 4], 3),
+
+young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
-youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 4], 3),
+
+youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
-oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 4], 3),
+
+oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
-old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
+
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
-older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
+
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
+                                    },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_metro, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
 
 data <- mutate(data, lab = if_else(age == "25-34 years", younger,
@@ -1058,24 +1130,53 @@ data <- read_csv("./output/state_health.csv") %>%
   filter(!isWhite) %>%
   inner_join(state.regions, by = "region")
 
-younger <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
-young <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
-youngish <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
-oldish <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
-old <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
-older <- paste("Slope: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 1], 3),
-                           "\np: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))[[4]][2, 4], 3),
-                           "\nr^2: ", signif(summary(lm(prop_urban ~ deaths_per_100k, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "25-34 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "25-34 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "25-34 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "25-34 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
+
+young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "35-44 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "35-44 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "35-44 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "35-44 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
+
+youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "45-54 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "45-54 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "45-54 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "45-54 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
+
+oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "55-64 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "55-64 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "55-64 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "55-64 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
+
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_urban, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
 
 data <- mutate(data, lab = if_else(age == "25-34 years", younger,
                                    if_else(age == "35-44 years", young,
@@ -1113,6 +1214,101 @@ ggplot(data, aes(100 * prop_urban, deaths_per_100k)) +
 
 Words.
 
+```{r graphRural, include = TRUE, fig.cap = "**Figure:**"}
+data <- read_csv("./output/state_health.csv") %>%
+  filter(!isWhite) %>%
+  inner_join(state.regions, by = "region")
+
+younger <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "25-34 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "25-34 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "25-34 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "25-34 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "25-34 years")))$r.squared, 3), sep = "")
+
+young <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "35-44 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "35-44 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "35-44 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "35-44 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "35-44 years")))$r.squared, 3), sep = "")
+
+youngish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "45-54 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "45-54 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "45-54 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "45-54 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "45-54 years")))$r.squared, 3), sep = "")
+
+oldish <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "55-64 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "55-64 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "55-64 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "55-64 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "55-64 years")))$r.squared, 3), sep = "")
+
+old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+
+older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
+                           "\np: ", if(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
+                                      paste(signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
+                                    } else {
+                                      signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "75-84 years")))[[4]][2, 4], 3)
+                                    },
+                           "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_rural, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
+
+data <- mutate(data, lab = if_else(age == "25-34 years", younger,
+                                   if_else(age == "35-44 years", young,
+                                           if_else(age == "45-54 years", youngish,
+                                                   if_else(age == "55-64 years", oldish,
+                                                           if_else(age == "65-74 years", old,
+                                                                   older))))),
+               y = if_else(age == "25-34 years", 5,
+                                   if_else(age == "35-44 years", 20,
+                                           if_else(age == "45-54 years", 50,
+                                                   if_else(age == "55-64 years", 100,
+                                                           if_else(age == "65-74 years", 300,
+                                                                   750))))))
+
+ggplot(data, aes(100 * prop_rural, deaths_per_100k)) +
+  geom_point(size = 5.25, color = "black") +
+  geom_text(label = data$abb, color = "white", size = 2.125, aes(y = deaths_per_100k)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
+  facet_grid(age ~ 42, scales = "free") +
+  theme_linedraw() +
+  theme(panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_text(size = 10)) +
+  labs(title = "Per Capita COVID Deaths vs\nPopulation in Rural Counties by State",
+       subtitle = "Among non-White Population",
+       x = "Percent living in Rural Counties",
+       y = "Deaths per 100k Population") +
+  geom_label(label = data$lab, aes(15, y)) +
+  ggsave("./figures/state_rural.png", height = 14, width = 7)
+
+rm(younger, young, youngish, oldish, old, older, data)
+```
+
+Words.
+
+# TODO
+
+Urban Rural Commentary
+
 ---
 
 \
@@ -1122,6 +1318,110 @@ Words.
 Here goes all the random little things to look into (Whole Foods, religion, etc.).
 
 \
+
+```{r electionData, echo = FALSE, message = FALSE}
+read_excel("./raw_data/States-Votes.xlsx", sheet = "Table 2. Electoral &  Pop Vote") %>%
+  select(1, 4, 5) %>%
+  rename(State = 1, Trump = 2, Clinton = 3) %>%
+  slice(4:54) %>%
+  mutate(Trump = as.numeric(Trump), Clinton = as.numeric(Clinton)) %>%
+  mutate(Margin = (Trump - Clinton) / (Trump + Clinton)) %>%
+  full_join(read_csv("./raw_data/states_governors.csv"), by = "State") %>%
+  select(State, Margin) %>%
+  write_csv("./output/States_info.csv")
+```
+
+Words.
+
+```{r religionData, echo = FALSE, message = FALSE}
+data("state.regions")
+tibbie <- read_sav("./raw_data/Dataset - Pew Research Center 2014 Religious Landscape Study National Telephone Survey - Version 1.1 - December 1 2016.sav") %>%
+  select(c(state, WEIGHT, qe1, qg1)) %>%
+  rename(State = state, Religion = qe1, God = qg1, Weight = WEIGHT) %>%
+  mutate(Religion = if_else(Religion == 9 | Religion == 10 | Religion == 12, 0,
+            if_else(Religion > 0 & Religion < 100, 1,
+                  2))) %>%
+  filter(!(Religion == 2)) %>%
+  filter(God == 1 | God == 2) %>%
+  mutate(God = if_else(God == 1, 1, 0)) %>%
+  group_by(State)
+
+totalWeight <- tibbie %>%
+  summarize(Total_Weight = sum(Weight)) %>%
+  distinct()
+
+totalReligionWeight <- tibbie %>%
+  right_join(totalWeight) %>%
+  mutate(Religion_Weight = Religion * Weight) %>%
+  summarize(Total_Religion_Weight = sum(Religion_Weight)) %>%
+  distinct()
+
+totalGodWeight <- tibbie %>%
+  right_join(totalWeight) %>%
+  mutate(God_Weight = God * Weight) %>%
+  summarize(Total_God_Weight = sum(God_Weight)) %>%
+  distinct()
+
+proportionNone <- totalReligionWeight %>%
+  right_join(totalWeight) %>%
+  transmute(State, Proportion_None = (Total_Weight - Total_Religion_Weight) / Total_Weight) # These values are off by +- 2% of the official cross tabs given by Pew, but clearly this roundabout way of weighting is "relatively" accurate
+
+proportionNoGod <- totalGodWeight %>%
+  right_join(totalWeight) %>%
+  transmute(State, Proportion_NoGod = (Total_Weight - Total_God_Weight) / Total_Weight) # These values appear to be "exactly" the same as the official cross tabs. How the same procedure can exist in a quantum state of correctly and incorrectly weighting is left as an exercise to the reader.
+
+state.regions %>%
+  right_join(proportionNone, by = c("fips.numeric" = "State")) %>%
+  right_join(proportionNoGod, by = c("fips.numeric" = "State")) %>%
+  select(-c("abb", "fips.numeric", "fips.character")) %>%
+	write_csv("./output/States_religion.csv")
+
+rm(proportionNoGod, proportionNone)
+```
+
+Words.
+
+```{r confederateData, echo = FALSE, message = FALSE, warning = FALSE}
+monuments <- read_csv("./raw_data/Whose Heritage SF - Symbol Type Count by State.csv") %>%
+  slice(2:36) %>%
+  select("COUNTA of feature_name", X14) %>%
+  rename(State = "COUNTA of feature_name", Monuments = X14) %>%
+  group_by(State) %>%
+  filter(!is.na(Monuments)) %>%
+  mutate(Monuments = as.numeric(Monuments)) %>%
+  filter(State != "Grand Total")
+
+georgia <- filter(monuments, State == "Georgia")
+
+monuments <- mutate(monuments, Monuments = if_else(State == "GA", Monuments + georgia$Monuments, Monuments)) %>%
+  filter(State != "Georgia") %>%
+  left_join(state.regions, by = c("State" = "abb")) %>%
+  ungroup() %>%
+  select(region, Monuments)
+
+# Close enough to correct estimates of state pop using lazy code copying
+statePop <- read_csv("./output/census_state_age_race_data.csv") %>%
+  group_by(region) %>%
+  summarize(pop = sum(Pop_White + `Pop_Non-White`))
+
+full_join(monuments, statePop, by =  "region") %>%
+  transmute(region, Per_Capita_Monuments = if_else(is.na(Monuments), 0, Monuments / pop)) %>%
+	write_csv("./output/States_monuments.csv")
+
+rm(georgia, monuments)
+```
+
+Words.
+
+```{r wholeFoodsData, echo = FALSE, message = FALSE}
+read_csv("./raw_data/states_whole_foods.csv") %>%
+  inner_join(state.regions, by = c("State" = "abb")) %>%
+  right_join(statePop, by = "region") %>%
+  transmute(region, Per_Capita_Whole_Foods = Number_Whole_Foods / pop) %>%
+	write_csv("./output/states_whole_foods.csv")
+```
+
+Words.
 
 ---
 
