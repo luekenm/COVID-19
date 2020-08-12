@@ -8,7 +8,7 @@
 
 ## Abstract
 
-There's this thing, COVID, that we don't like. We don't really know much about how it affects people. We should really look into that.
+Racial disparity in health, demographic, and COVID data was examined. Analyses revealed significant correlations between pneumonia vaccination and per capita COVID deaths, as well as population density and per capita COVID deaths. The non-White population was found to be significantly over-represented among COVID deaths, with rates of pneumonia vaccination and urban living likely contributing to the disparity.
 
 ## Introduction
 

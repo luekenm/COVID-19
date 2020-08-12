@@ -537,7 +537,9 @@ rm(ny, nyc)
 
 This report is a data analysis investigation into racial disparity in deaths from COVID-19 in the United States, and the effects of certain health and demographic factors.
 
-**NOTE:** Throughout the report the population is separated into two groups, "non-Hispanic White only", and "not Non-Hispanic White only", based on Census categories. For lack of a more feasible racially-sensitive construct, these will be referred to as "White" and "non-White", respectively. Any analyses including "Hispanic Whites" in "White", or not limiting to "White only", or using any other racial groupings, could reach different, equally-valid conclusions.
+**NOTE:** Throughout the report the population is separated into two groups, "non-Hispanic White only", and "not Non-Hispanic White only", based on Census categories. For lack of a more feasible racially-sensitive construct, these will be referred to as "White" and "non-White", respectively. Any analyses including Hispanic Whites in White, or not limiting to White only, or using any other racial groupings, could reach different, equally-valid conclusions.
+
+**Reproducibility:** The source code for this report, including links to all of datasets and images used, as well as the methodology (with comments) used to produce all of the figures is available at [https://raw.githubusercontent.com/luekenm/COVID-19/master/index.Rmd](https://raw.githubusercontent.com/luekenm/COVID-19/master/index.Rmd). A more user-friendly repository is available at [https://github.com/luekenm/COVID-19](https://github.com/luekenm/COVID-19).
 
 ---
 
@@ -549,11 +551,11 @@ This report is a data analysis investigation into racial disparity in deaths fro
 
 1. The sex and/or party of a State's Governor has an effect on racial disparity in COVID deaths.
 
-1. There are differences in health factors and outcomes by racial group
+1. There are differences in health factors between racial group
 
-1. Some health factors contribute to COVID deaths
+1. Some of these health factors contribute to COVID deaths
 
-1. There are differences in population density between racial groups
+1. There are differences in measures of population density between racial groups
 
 1. Per capita COVID deaths scale with measures of population density
 
