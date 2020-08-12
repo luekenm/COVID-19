@@ -591,7 +591,10 @@ ggplot(states) +
                       low = "#000000",
                       high = "#18FF16",
                       na.value = "#555555") +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(panel.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -602,7 +605,7 @@ ggplot(states) +
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/choropleth_pop.png")
+  ggsave("./figures/choropleth_pop.png", width = 4.6, height = 3.25)
 ```
 
 ![**Figure 1:** Racial Map of the United States](./figures/choropleth_pop.png)
@@ -631,7 +634,10 @@ ggplot(states) +
                       low = "#000000",
                       high = "#1816FF",
                       na.value = "#555555") +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(panel.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -642,7 +648,7 @@ ggplot(states) +
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/choropleth_deaths.png")
+  ggsave("./figures/choropleth_deaths.png", width = 4.6, height = 3.25)
 ```
 
 ![**Figure 2:** Non-White COVID Deaths as proportion of total COVID Deaths in the United States](./figures/choropleth_deaths.png)
@@ -673,7 +679,10 @@ ggplot(states) +
                       midpoint = 1.0,
                       high = "red",
                       na.value = "black") +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(panel.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -685,7 +694,7 @@ ggplot(states) +
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/ratio_state.png")
+  ggsave("./figures/ratio_state.png", width = 7, height = 4.75)
 ```
 
 ![**Figure 3:** A map of the Racial Disparity Index for the United States](./figures/ratio_state.png)
@@ -733,7 +742,10 @@ ggplot(filter(mapData, region == "michigan"), aes(x = long,
                       high = "red",
                       midpoint = 1,
                       na.value = "black") +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(panel.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -745,7 +757,7 @@ ggplot(filter(mapData, region == "michigan"), aes(x = long,
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/ratio_county_mi.png", width = 6, height = 6)
+  ggsave("./figures/ratio_county_mi.png", width = 6.865, height = 8)
 ```
 
 ![**Figure 4**: A Map of the Racial Disparity Index for Michigan](./figures/ratio_county_mi.png)
@@ -762,7 +774,10 @@ ggplot(filter(mapData, region == "new york"), aes(x = long,
                       high = "red",
                       midpoint = 1,
                       na.value = "black") +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(panel.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -774,7 +789,7 @@ ggplot(filter(mapData, region == "new york"), aes(x = long,
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/ratio_county_ny.png", width = 7, height = 6)
+  ggsave("./figures/ratio_county_ny.png", width = 6.4, height = 6)
 ```
 
 ![**Figure 5:** A Map of the Racial Disparity Index for New York](./figures/ratio_county_ny.png)
@@ -804,14 +819,24 @@ read_csv("./output/cdc_state_covid_age_race_data.csv") %>%
   summarize(ageNum, pop_avg = (sum(`Non-White`) / sum(White + `Non-White`)) / (sum(`Pop_Non-White`) / sum(`Pop_Non-White` + Pop_White))) %>%
   distinct() %>%
   mutate(pop_avg = replace_na(pop_avg, 1.0)) %>%
-  ggplot(aes(x = ageNum, y = pop_avg, color = `Census Region`)) +
-  geom_line(size = 2) +
+  ggplot(aes(x = ageNum, color = `Census Region`, fill = `Census Region`)) +
+  geom_bar(size = 3, aes(weight = pop_avg), position = position_dodge(width = 5)) +
   labs(title = "Ratio of Proportion of COVID Deaths to Proportion of Population\nfor non-White Population by Age and Census Region",
        x = "Age Bracket Midpoint",
        y = "RDI") +
   theme_linedraw() +
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5")) +
   ylim(0, 4) +
-  ggsave("./figures/rdi_regions.png")
+  ggsave("./figures/rdi_regions.png", width = 9, height = 5)
 ```
 
 ![**Figure 7:** RDI for each Census Region plotted by age bracket midpoint](./figures/rdi_regions.png)
@@ -835,6 +860,16 @@ ggplot(data, aes(x = ageNum, y = pop_avg, fill = region)) +
        x = "Age",
        y = "RDI") +
   theme_linedraw() +
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5")) +
   facet_wrap(~ `Census Region`) +
   ggsave("./figures/state_regions.png", height = 10, width = 7)
 ```
@@ -919,6 +954,16 @@ read_csv("./raw_data/states_governors.csv") %>%
   scale_color_discrete(name = "Governor Sex",
                        labels = c("Female", "Male")) +
   theme_linedraw() +
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5")) +
   ggsave("./figures/governor_sex.png")
 ```
 
@@ -942,6 +987,16 @@ read_csv("./raw_data/states_governors.csv") %>%
   scale_color_discrete(name = "Governor Party",
                        labels = c("Republican", "Democrat")) +
   theme_linedraw() +
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(size = 0.4375),
+        panel.grid.minor.y = element_line(size = 0.3125),
+        panel.grid.major.x = element_line(size = 0.25),
+        panel.grid.minor.x = element_line(size = 0.1875),
+        panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5")) +
   ggsave("./figures/governor_party.png")
 ```
 
@@ -1162,13 +1217,16 @@ ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
         strip.text.x = element_blank(),
         strip.text.y = element_text(size = 10)) +
   labs(title = "Per Capita COVID Deaths vs Pneumonia Vaccination by State",
@@ -1212,13 +1270,16 @@ ggplot(data, aes(100 * prop_asthma, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
         strip.text.x = element_blank(),
         strip.text.y = element_text(size = 10)) +
   labs(title = "Per Capita COVID Deaths vs Prevalence of Asthma by State",
@@ -1311,15 +1372,16 @@ ggplot(data, aes(100 * prop_metro, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
-        strip.text.x = element_blank(),
-        strip.text.y = element_text(size = 10)) +
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5")) +
   labs(title = "Per Capita COVID Deaths vs\nPopulation in Metropolitan Counties by State",
        subtitle = "Among non-White Population",
        x = "Percent living in Metropolitan Counties",
@@ -1402,13 +1464,16 @@ ggplot(data, aes(100 * prop_urban, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
         strip.text.x = element_blank(),
         strip.text.y = element_text(size = 10)) +
   labs(title = "Per Capita COVID Deaths vs\nPopulation in non-Suburban Metropolitan Counties by State",
@@ -1493,13 +1558,16 @@ ggplot(data, aes(100 * prop_rural, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
         strip.text.x = element_blank(),
         strip.text.y = element_text(size = 10)) +
   labs(title = "Per Capita COVID Deaths vs\nPopulation in Rural Counties by State",
@@ -1592,13 +1660,16 @@ ggplot(data, aes(density, deaths_per_100k)) +
   geom_smooth(method = "lm", se = FALSE, size = 1.125, color = "red") +
   facet_grid(age ~ 42, scales = "free") +
   theme_linedraw() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
+        plot.margin = unit(c(0, 0, 0, 0), "mm"),
+        plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         panel.grid.major.y = element_line(size = 0.4375),
         panel.grid.minor.y = element_line(size = 0.3125),
         panel.grid.major.x = element_line(size = 0.25),
         panel.grid.minor.x = element_line(size = 0.1875),
         panel.background = element_rect(fill = "#DDDDDD"),
+        legend.background = element_rect(fill = "#dce6f5", color = "#dce6f5"),
         strip.text.x = element_blank(),
         strip.text.y = element_text(size = 10)) +
   labs(title = "Per Capita COVID Deaths vs\nPopulation Density by State",
