@@ -10,80 +10,66 @@
 
 There's this thing, COVID, that we don't like. We don't really know much about how it affects people. We should really look into that.
 
-<br/>
-
 ## Introduction
 
-COVID is bad. Here's data. Let's see if a p<.05 falls out if we shake the data hard enough.
+This report is a data analysis investigation into racial disparity in deaths from COVID-19 in the United States, and the effects of certain health and demographic factors.
 
-<br/>
+NOTE: Throughout the report the population is separated into two groups, “non-Hispanic White only”, and “not Non-Hispanic White only”, based on Census categories. For lack of a more feasible racially-sensitive construct, these will be referred to as “White” and “non-White”, respectively. Any analyses including “Hispanic Whites” in “White”, or not limiting to “White only”, or using any other racial groupings, could reach different, equally-valid conclusions.
 
 ## Hypotheses
 
-It could be hypothesized that [independent variable] is [sign] correlated with Per Capita COVID Deaths.
+1. There is racial disparity in COVID deaths in America
 
-<br/>
-<table style="width:638px">
-  <tr>
-    <th>Hypothesis</th>
-    <th>Sign</th>
-    <th>Independent Variable</th>
-  </tr>
-  <tr>
-    <td>1</td>
-    <td>-</td>
-    <td>Per Capita Pneumonia Vaccination</td>
-  </tr>
-  <tr>
-    <td>2</td>
-    <td>+</td>
-    <td>Prevalence of Asthma</td>
-  </tr>
-  <tr>
-    <td>3</td>
-    <td>+</td>
-    <td>Male Governorship</td>
-  </tr>
-  <tr>
-    <td>4</td>
-    <td>+</td>
-    <td>Republican Governorship</td>
-  </tr>
-  <tr>
-    <td>5</td>
-    <td>-</td>
-    <td>Being White</td>
-  </tr>
-</table>
-<br/>
+2. Any racial disparity will not be affected by age group
+
+3. The sex and/or party of a State’s Governor has an effect on racial disparity in COVID deaths.
+
+4. There are differences in health factors and outcomes by racial group
+
+5. Some health factors contribute to COVID deaths
+
+6. Per capita COVID deaths scale with measures of population density
 
 ## Datasets Used
 
-* BRFSS LLCP 2018
-* NHANES 2015-2016
-* Harvard Dataverse
-* Wikipedia List of US Governors
-* FEC 2016 Election Results
-* Google
-* Pew Religious Landscape Survey
-* Whole Foods Store Finder
-* CDC Data
-* The Census
-
-<br/>
+* CDC Provisional Death Counts for Coronavirus Disease (COVID-19): Weekly State-Specific Data Updates
+* CDC Daily Updates of Totals by Week and State Provisional Death Counts for Coronavirus Disease 2019 (COVID-19)
+* CDC Behavioral Risk Factor Surveillance System 2018
+* Census QuickFacts New York
+* Census Annual State Resident Population Estimates for 6 Race Groups (5 Race Alone Groups and Two or More Races) by Age, Sex, and Hispanic Origin
+* Wikipedia List of United States governors
 
 ## Description of Analyses
 
-Lots of ANOVAs, and some graphs of the interesting bits.
+The Racial Disparity Index (RDI) was created, an ad hoc measure quantifying the ratio between per capita COVID deaths and expected per capita COVID deaths for the non-White population.
 
-<br/>
+The RDI was determined across states, Census regions, age groups, in various groupings.
+
+Plots and ANOVAs compared political information with RDIs.
+
+Health data focusing on respiratory factors were compared between racial groups.
+
+The effect of pneumonia vaccination and asthma on per capita COVID deaths was investigated.
+
+Demographic data focusing on population density were compared between racial groups.
+
+The effect of several measures of population density on per capita COVID deaths was investigated.
 
 ## Conclusions
 
-COVID is bad.
+* There is racial disparity in COVID deaths.
 
-<br/>
+* Age is not a factor in racial disparity in COVID deaths.
+
+* Political factors do not contribute to racial disparity in COVID deaths.
+
+* There are significant differences in health and demographic variables between racial groups.
+
+* Some of those health factors contribute to differences in COVID deaths.
+
+* Population density is a significant predictor of 
 
 ## Viewing this Project
 
-The completed project files can be accessed online at GitHub.com/luekenm/COVID-19
+This report can be viewed at luekenm.github.io/COVID-19
+The completed project files can be accessed online at github.com/luekenm/COVID-19.

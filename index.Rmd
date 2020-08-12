@@ -541,6 +541,24 @@ This report is a data analysis investigation into racial disparity in deaths fro
 
 ---
 
+# Hypotheses
+
+1. There is racial disparity in COVID deaths in America
+
+1. Any racial disparity will not be affected by age group
+
+1. The sex and/or party of a State's Governor has an effect on racial disparity in COVID deaths.
+
+1. There are differences in health factors and outcomes by racial group
+
+1. Some health factors contribute to COVID deaths
+
+1. There are differences in population density between racial groups
+
+1. Per capita COVID deaths scale with measures of population density
+
+---
+
 # Racial Data
 
 The data on population and racial breakdowns by states come from the Census. The [Annual State Resident Population Estimates for 6 Race Groups (5 Race Alone Groups and Two or More Races) by Age, Sex, and Hispanic Origin](https://www2.census.gov/programs-surveys/popest/technical-documentation/file-layouts/2010-2019/sc-est2019-alldata6.pdf) document from 2020 gives the estimates as of 2020-07-01, the most recent publicly available figures.
@@ -584,10 +602,10 @@ ggplot(states) +
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/chorpleth_pop.png")
+  ggsave("./figures/choropleth_pop.png")
 ```
 
-![**Figure 1:** Racial Map of the United States](./figures/chorpleth_pop.png)
+![**Figure 1:** Racial Map of the United States](./figures/choropleth_pop.png)
 
 Figure 1 shows the concentration of non-White populations as a percentage of total population. Populations of note include: the Black population in the South and Chicago and Detroit, the large Hispanic population in the Southwest and Florida, and the noticeable populations of immigrants on the Pacific and North Atlantic coasts (and especially near New York City). The rest of the West, Midwest, and New England is noticeably lacking in non-White population except for in major urban areas.
 
@@ -624,10 +642,10 @@ ggplot(states) +
        x = "",
        y = "") +
   coord_map() +
-  ggsave("./figures/chorpleth_deaths.png")
+  ggsave("./figures/choropleth_deaths.png")
 ```
 
-![**Figure 2:** Non-White COVID Deaths as proportion of total COVID Deaths in the United States](./figures/chorpleth_deaths.png)
+![**Figure 2:** Non-White COVID Deaths as proportion of total COVID Deaths in the United States](./figures/choropleth_deaths.png)
 
 Figure 2 shows the percentage of COVID deaths in each state that occured within the non-White population. *Ceteris paribus*, this map should be roughly identical to figure 1. To meaningfully quantify the differences between figures 1 and 2, a new measure, the **Racial Disparity Index (RDI)** is introduced. The RDI is the ratio of "proportion of COVID deaths from among the non-White population" to "the proportion of the population that is non-White". If deaths were equally distributed between racial groups, the RDI would be near 1. A value at or near zero indicates deaths occurred almost exclusively among the White population. A value of 2 indicates that twice as many deaths as expected occurred among the non-White population. The RDI is an imperfect *ad hoc* measure, but it can help give a simplified, intuitive sense of the racial disparity in COVID deaths.
 
@@ -1118,6 +1136,7 @@ data <- read_csv("./output/state_health.csv") %>%
   filter(age %in% c("65-74 years", "75-84 years") & !isWhite) %>%
   inner_join(state.regions, by = "region")
 
+# These monstrosities perform linear fit statistics on the graph for each age group, and adds ** if they find a significant correlation
 old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 1] / 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4], 3), "**", sep = "")
@@ -1125,6 +1144,7 @@ old <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(dat
                                       signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))[[4]][2, 4], 3)
                                     },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "65-74 years")))$r.squared, 3), sep = "")
+
 older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 1] / 100.0, 3),
                            "\np: ", if(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 4] < 0.05) {
                                       paste(signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))[[4]][2, 4], 3), "**", sep = "")
@@ -1133,6 +1153,7 @@ older <- paste("Slope: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(d
                                     },
                            "\nr^2: ", signif(summary(lm(deaths_per_100k ~ prop_vax, filter(data, age == "75-84 years")))$r.squared, 3), sep = "")
 
+# Combining the data with the statistics
 data <- mutate(data, lab = if_else(age == "65-74 years", old, older), y = if_else(age == "65-74 years", 300, 1100))
 
 ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
@@ -1154,7 +1175,7 @@ ggplot(data, aes(100 * prop_vax, deaths_per_100k)) +
        subtitle = "Among Elderly non-White Population",
        x = "Percent Vaccinated against Pneumonia",
        y = "Deaths per 100k Population") +
-  geom_label(label = data$lab, aes(85, data$y)) +
+  geom_label(label = data$lab, aes(85, data$y)) + # This adds the statistics to the plot
   ggsave("./figures/graph_vaccination.png")
 ```
 
@@ -1618,7 +1639,7 @@ read_csv("./output/BRFSS.csv") %>%
 
 # Conclusions
 
-The analyses revealed widespread, significant racial disparity in COVID deaths. Among the non-White population, the increased probability of living in more population-dense conditions (table 5) is likely to contribute seriously to difference in deaths. While some underlying health factors were found to contribute as well, without better reporting of death and comorbidity data, the evidence for the contributions of other health and demographic factors is too sparse for additional meaningful conclusions to be drawn yet. In short, close proximity to other humans is likely to be the strongest predictor of mortality from COVID, and a major driver of racial disparity in pandemic deaths.
+The analyses revealed widespread, significant racial disparity in COVID deaths. The racial disparity was largely stable across states and age groups. No political factors were found to significantly contribute to racial disparity in COVID deaths. Noteable differences in health and demographic factors were uncovered, including pneumonia vaccination. While some health factors were found to contribute to deaths to COVID, without better reporting of death and comorbidity data, the evidence for the contributions of other health and demographic factors is too sparse for additional meaningful conclusions to be drawn yet. Most conclusively, the increased probability of living in more population-dense conditions among the non-White population (table 5) is likely to contribute seriously to difference in deaths. In short, close proximity to other humans is likely to be the strongest predictor of mortality from COVID, and a major driver of racial disparity in pandemic deaths.
 
 ---
 
@@ -1647,19 +1668,3 @@ Special thanks to the following sources of data:
 ## [The Wikimedia Foundation](https://wikimediafoundation.org/)
 
 ### [List of United States governors](https://en.wikipedia.org/wiki/List_of_United_States_governors)
-
-## [The Federal Election Commision](https://www.fec.gov/)
-
-### [Federal Elections 2016](https://www.fec.gov/introduction-campaign-finance/election-and-voting-information/federal-elections-2016/)
-
-## [Pew Research Center](https://www.pewresearch.org/)
-
-### [Religious Landscape Study](https://www.pewforum.org/religious-landscape-study/)
-
-## [Whole Foods Market](https://www.wholefoodsmarket.com/)
-
-### [Store Finder](https://www.wholefoodsmarket.com/stores)
-
-## [Southern Poverty Law Center](https://www.splcenter.org/)
-
-### [Whose Heritage?](https://www.splcenter.org/20190201/whose-heritage-public-symbols-confederacy)
